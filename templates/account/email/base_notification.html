@@ -1,0 +1,7 @@
+{% extends "account/email/base_message.html" %}
+{% load account %}
+{% load i18n %}
+
+{% block content %}{% autoescape off %}{% blocktrans %}You are receiving this mail because the following change was made to your account:{% endblocktrans %}
+
+{% endautoescape %}{% endblock %}

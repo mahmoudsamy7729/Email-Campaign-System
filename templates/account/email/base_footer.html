@@ -1,0 +1,24 @@
+<table border="0" cellpadding="10" cellspacing="0" width="100%">
+  <tr>
+    <td valign="top">
+      <div mc:edit="std_footer">
+        <em>Copyright &copy; {% now "Y" %} Emaily, All rights reserved.</em>
+        <br />
+        <strong>Our mailing address is:</strong>
+        <br />
+        *|HTML:LIST_ADDRESS_HTML|**|END:IF|*
+      </div>
+    </td>
+  </tr>
+  <tr>
+    <td valign="middle" id="utility">
+      <div mc:edit="std_utility">
+        &nbsp;<a href="{{ activate_url }}" target="_blank"
+          >view this in your browser</a
+        >
+        | <a href="*|UNSUB|*">unsubscribe from this list</a> |
+        <a href="*|UPDATE_PROFILE|*">update subscription preferences</a>&nbsp;
+      </div>
+    </td>
+  </tr>
+</table>
