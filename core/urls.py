@@ -17,9 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView
+from accounts.views import index
 
 urlpatterns = [
+    path("", include("accounts.urls")),
     path('admin/', admin.site.urls),
     path("accounts/", include("allauth.urls")),  # signup/login/verify/reset
-    path("", TemplateView.as_view(template_name="home.html"), name="home"),
+    path("home/", TemplateView.as_view(template_name="home.html"), name="home"),
+
 ]

@@ -28,7 +28,7 @@ SECRET_KEY = config("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 
 # Application definition
@@ -48,6 +48,11 @@ INSTALLED_APPS = [
     "allauth.socialaccount",
     # Apps
     "accounts",
+    "audience",
+    # Virsto
+    'tailwind',
+    'vristoDjango',
+
 ]
 
 SITE_ID = 1
@@ -161,6 +166,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
+
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -206,3 +217,6 @@ LOGGING = {
         },
     },
 }
+
+TAILWIND_APP_NAME = 'vristoDjango'
+TAILWIND_CSS_PATH = 'assets/css/styles.css'
