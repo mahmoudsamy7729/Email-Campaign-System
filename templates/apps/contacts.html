@@ -1,0 +1,924 @@
+{% extends 'components/layouts/default.html' %} {% load static %}
+{% block content %}
+
+<div x-data="contacts()" class="space-y-6">
+  <!-- Header -->
+  <div class="flex items-start justify-between flex-wrap gap-4">
+    <div>
+      <h2 class="text-2xl font-semibold">Audience</h2>
+      <p class="text-white-dark text-sm">
+        Manage, filter, and segment your contacts.
+      </p>
+    </div>
+    <div class="flex gap-2">
+      <a href="#" class="btn btn-outline-primary">Import</a>
+      <a href="#" class="btn btn-outline-primary">Export</a>
+      <button type="button" class="btn btn-primary" @click="openAdd()">
+        <svg
+          width="20"
+          height="20"
+          class="inline-block ltr:mr-2 rtl:ml-2"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <path
+            d="M12 5v14M5 12h14"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+          />
+        </svg>
+        Add contact
+      </button>
+    </div>
+  </div>
+
+  <!-- Controls (Search + Filters + Bulk actions) -->
+  <div class="flex flex-wrap items-center gap-3">
+    <!-- Search -->
+    <div class="relative">
+      <input
+        type="text"
+        placeholder="Search name or email"
+        class="form-input py-2 ltr:pr-10 rtl:pl-10 w-72"
+        x-model="q"
+        @input.debounce.300ms="applyFilters"
+      />
+      <div
+        class="absolute ltr:right-[11px] rtl:left-[11px] top-1/2 -translate-y-1/2 peer-focus:text-primary"
+      >
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          class="w-4 h-4"
+        >
+          <circle
+            cx="11.5"
+            cy="11.5"
+            r="9.5"
+            stroke="currentColor"
+            stroke-width="1.5"
+            opacity="0.5"
+          ></circle>
+          <path
+            d="M18.5 18.5L22 22"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          ></path>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <select
+      class="form-input py-2 w-48"
+      x-model="filters.status"
+      @change="applyFilters"
+    >
+      <option value="">All statuses</option>
+      <option value="subscribed">Subscribed</option>
+      <option value="unsubscribed">Unsubscribed</option>
+      <option value="cleaned">Cleaned</option>
+      <option value="non-subscribed">Non-subscribed</option>
+    </select>
+
+    <!-- Segment -->
+    <select
+      class="form-input py-2 w-56"
+      x-model="filters.segment"
+      @change="applyFilters"
+    >
+      <option value="">All contacts</option>
+      <option value="recent">Active last 30 days</option>
+      <option value="cold">No opens 90 days</option>
+      <option value="new">New this week</option>
+    </select>
+
+    <!-- Tag filter -->
+    <div class="flex items-center gap-2">
+      <select class="form-input py-2 w-80" x-model="tagToToggle">
+        <option value="">Filter by tag…</option>
+        <template x-for="t in allTags" :key="t">
+          <option :value="t" x-text="t"></option>
+        </template>
+      </select>
+      <button class="btn btn-outline-primary" @click="toggleTagFilter()">
+        Apply
+      </button>
+    </div>
+
+    <!-- Reset -->
+    <button
+      class="btn btn-outline-danger ltr:ml-auto rtl:mr-auto"
+      @click="clearFilters"
+    >
+      Reset
+    </button>
+
+    <!-- Bulk actions -->
+    <div class="relative" x-data="{open:false}">
+      <button
+        class="btn btn-outline-primary"
+        :class="{'opacity-50 pointer-events-none': selected.size===0}"
+        @click="open=!open"
+      >
+        Bulk actions
+      </button>
+      <div
+        x-show="open"
+        @click.outside="open=false"
+        class="absolute z-10 mt-2 w-48 panel p-2"
+      >
+        <button
+          class="w-full text-left px-3 py-2 rounded hover:bg-gray-50 dark:hover:bg-[#111827]"
+          @click="bulk('tag'); open=false"
+        >
+          Add tag…
+        </button>
+        <button
+          class="w-full text-left px-3 py-2 rounded hover:bg-gray-50 dark:hover:bg-[#111827]"
+          @click="bulk('unsubscribe'); open=false"
+        >
+          Unsubscribe
+        </button>
+        <button
+          class="w-full text-left px-3 py-2 rounded text-danger hover:bg-gray-50 dark:hover:bg-[#111827]"
+          @click="bulk('delete'); open=false"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+    <div class="text-sm text-white-dark" x-show="selected.size">
+      Selected: <span x-text="selected.size"></span>
+    </div>
+  </div>
+
+  <!-- Active tag chips -->
+  <div class="flex flex-wrap gap-2" x-show="filters.tags.length">
+    <template x-for="t in filters.tags" :key="t">
+      <span
+        class="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-[#111827] px-3 py-1 text-xs"
+      >
+        <span x-text="t"></span>
+        <button
+          class="text-white-dark hover:text-primary"
+          @click="removeTagFilter(t)"
+        >
+          ✕
+        </button>
+      </span>
+    </template>
+  </div>
+
+  <!-- Table -->
+  <div class="panel p-0 border-0 overflow-hidden">
+    <div class="table-responsive">
+      <table class="table-striped table-hover">
+        <thead>
+          <tr>
+            <th class="!w-10">
+              <input
+                type="checkbox"
+                @change="toggleAll($event)"
+                :checked="allOnPageSelected"
+              />
+            </th>
+            <th @click="sortBy('name')" class="cursor-pointer">Name</th>
+            <th @click="sortBy('email')" class="cursor-pointer">Email</th>
+            <th>Status</th>
+            <th>Tags</th>
+            <th>Source</th>
+            <th
+              @click="sortBy('signup_at')"
+              class="cursor-pointer whitespace-nowrap"
+            >
+              Signup date
+            </th>
+            <th
+              @click="sortBy('last_activity_at')"
+              class="cursor-pointer whitespace-nowrap"
+            >
+              Last activity
+            </th>
+            <th class="!text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="c in pageItems" :key="c.id">
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  :value="c.id"
+                  @change="toggleOne(c.id, $event)"
+                  :checked="selected.has(c.id)"
+                />
+              </td>
+              <td>
+                <div class="flex items-center w-max">
+                  <template x-if="c.path">
+                    <img
+                      :src="`{% static 'assets/images' %}/${c.path}`"
+                      class="h-8 w-8 rounded-full object-cover ltr:mr-2 rtl:ml-2"
+                      alt="avatar"
+                    />
+                  </template>
+                  <template x-if="!c.path">
+                    <div
+                      class="grid place-content-center h-8 w-8 ltr:mr-2 rtl:ml-2 rounded-full bg-primary text-white text-sm font-semibold"
+                    >
+                      <span
+                        x-text="(c.name||'').slice(0,1) + ((c.name||' ').split(' ')[1]||'').slice(0,1)"
+                      ></span>
+                    </div>
+                  </template>
+                  <div class="font-medium" x-text="c.name || '—'"></div>
+                </div>
+              </td>
+              <td>
+                <a
+                  :href="`mailto:${c.email}`"
+                  class="text-primary hover:underline"
+                  x-text="c.email"
+                ></a>
+              </td>
+              <td>
+                <span
+                  :class="statusClass(c.status)"
+                  class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                  x-text="cap(c.status)"
+                ></span>
+              </td>
+              <td>
+                <div class="flex flex-wrap gap-1">
+                  <template x-for="t in c.tags" :key="t">
+                    <span
+                      class="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#111827] text-xs"
+                      x-text="t"
+                    ></span>
+                  </template>
+                </div>
+              </td>
+              <td x-text="c.source || 'Import'"></td>
+              <td x-text="fmtDate(c.signup_at)"></td>
+              <td x-text="fmtDate(c.last_activity_at)"></td>
+              <td class="!text-center">
+                <div class="flex gap-2 justify-center">
+                  <a
+                    :href="`/contacts/${c.id}`"
+                    class="btn btn-sm btn-outline-primary"
+                    >View</a
+                  >
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    @click="openEdit(c)"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger"
+                    @click="remove(c)"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="!pageItems.length">
+            <td colspan="9" class="text-center py-10 text-white-dark">
+              No contacts match your filters.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between px-4 py-3 border-t">
+      <div class="text-sm text-white-dark">
+        Showing <span x-text="fromRow"></span>–<span x-text="toRow"></span> of
+        <span x-text="filtered.length"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          class="btn btn-outline-primary"
+          :disabled="page===1"
+          @click="page--"
+        >
+          Prev
+        </button>
+        <div class="text-sm">
+          Page <span x-text="page"></span> / <span x-text="totalPages"></span>
+        </div>
+        <button
+          class="btn btn-outline-primary"
+          :disabled="page===totalPages"
+          @click="page++"
+        >
+          Next
+        </button>
+        <select
+          class="form-input py-1 w-24"
+          x-model.number="perPage"
+          @change="page=1"
+        >
+          <option :value="10">10</option>
+          <option :value="25">25</option>
+          <option :value="50">50</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div
+    class="fixed inset-0 bg-[black]/60 z-[999] overflow-y-auto"
+    x-show="modal"
+    x-transition
+    x-cloak
+  >
+    <div
+      class="flex items-center justify-center min-h-screen px-4"
+      @click.self="closeModal()"
+    >
+      <div
+        class="panel border-0 p-0 rounded-lg overflow-hidden md:w-full max-w-lg w-[90%] my-8"
+      >
+        <button
+          type="button"
+          class="absolute top-4 ltr:right-4 rtl:left-4 text-white-dark hover:text-dark"
+          @click="closeModal()"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24px"
+            height="24px"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+        <h3
+          class="text-lg font-medium bg-[#fbfbfb] dark:bg-[#121c2c] ltr:pl-5 rtl:pr-5 py-3 ltr:pr-[50px] rtl:pl-[50px]"
+          x-text="form.id ? 'Edit Contact' : 'Add Contact'"
+        ></h3>
+        <div class="p-5">
+          <form @submit.prevent="save()">
+            <div class="grid grid-cols-1 gap-4">
+              <div>
+                <label>Name</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  placeholder="Full name"
+                  x-model="form.name"
+                />
+              </div>
+              <div>
+                <label>Email</label>
+                <input
+                  type="email"
+                  class="form-input"
+                  placeholder="email@example.com"
+                  x-model="form.email"
+                />
+              </div>
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label>Phone</label>
+                  <input
+                    type="text"
+                    class="form-input"
+                    placeholder="+1 202 555…"
+                    x-model="form.phone"
+                  />
+                </div>
+                <div>
+                  <label>Status</label>
+                  <select class="form-input" x-model="form.status">
+                    <option value="subscribed">Subscribed</option>
+                    <option value="unsubscribed">Unsubscribed</option>
+                    <option value="cleaned">Cleaned</option>
+                    <option value="non-subscribed">Non-subscribed</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label>Tags (comma separated)</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  placeholder="VIP, Lead, Customer"
+                  x-model="form.tagsCsv"
+                />
+              </div>
+              <div>
+                <label>Location</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  placeholder="City, Country"
+                  x-model="form.location"
+                />
+              </div>
+            </div>
+            <div class="flex justify-end items-center mt-6">
+              <button
+                type="button"
+                class="btn btn-outline-danger"
+                @click="closeModal()"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                class="btn btn-primary ltr:ml-3 rtl:mr-3"
+                x-text="form.id ? 'Update' : 'Add'"
+              ></button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+fetch("/api/audience/contacts/?audience=a4b78b5a-d560-4367-9d89-0dee0ab79b19")
+  .then(r => r.json()).then(console.log)
+</script>
+
+<script>
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("contacts", () => ({
+      // UI state
+      q: "",
+      filters: { status: "", segment: "", tags: [] },
+      tagToToggle: "",
+      selected: new Set(),
+      modal: false,
+      page: 1,
+      perPage: 10,
+      sort: { key: "name", dir: "asc" },
+
+      // Data
+      allTags: ["VIP", "Lead", "Customer", "Newsletter", "Trial", "High-Value"],
+      contacts: [
+        {
+          id: 1,
+          path: "profile-35.png",
+          name: "Alan Green",
+          email: "alan@mail.com",
+          status: "subscribed",
+          tags: ["VIP", "Customer"],
+          source: "Form",
+          signup_at: "2025-07-22",
+          last_activity_at: "2025-08-10",
+          phone: "+1 202 555 0197",
+          location: "Boston, USA",
+        },
+        {
+          id: 2,
+          path: "profile-35.png",
+          name: "Linda Nelson",
+          email: "linda@mail.com",
+          status: "unsubscribed",
+          tags: ["Newsletter"],
+          source: "Import",
+          signup_at: "2025-05-18",
+          last_activity_at: "2025-06-01",
+          phone: "+1 202 555 0170",
+          location: "Sydney, Australia",
+        },
+        {
+          id: 3,
+          path: "profile-35.png",
+          name: "Lila Perry",
+          email: "lila@mail.com",
+          status: "subscribed",
+          tags: ["Lead"],
+          source: "API",
+          signup_at: "2025-08-01",
+          last_activity_at: "2025-08-12",
+          phone: "+1 202 555 0105",
+          location: "Miami, USA",
+        },
+        {
+          id: 4,
+          path: "profile-35.png",
+          name: "Andy King",
+          email: "andy@mail.com",
+          status: "non-subscribed",
+          tags: ["Trial"],
+          source: "Form",
+          signup_at: "2025-07-28",
+          last_activity_at: "2025-07-30",
+          phone: "+81 202 555 0194",
+          location: "Tokyo, Japan",
+        },
+        {
+          id: 5,
+          path: "profile-35.png",
+          name: "Jesse Cory",
+          email: "jesse@mail.com",
+          status: "cleaned",
+          tags: ["Newsletter", "Lead"],
+          source: "Import",
+          signup_at: "2025-04-04",
+          last_activity_at: "2025-05-12",
+          phone: "+44 202 555 0161",
+          location: "Edinburgh, UK",
+        },
+        {
+          id: 6,
+          path: "profile-35.png",
+          name: "Xavier",
+          email: "xavier@mail.com",
+          status: "subscribed",
+          tags: ["Customer"],
+          source: "Form",
+          signup_at: "2025-08-10",
+          last_activity_at: "2025-08-13",
+          phone: "+1 202 555 0155",
+          location: "New York, USA",
+        },
+        {
+          id: 7,
+          path: "profile-35.png",
+          name: "Susan",
+          email: "susan@mail.com",
+          status: "subscribed",
+          tags: ["VIP", "High-Value"],
+          source: "CRM Sync",
+          signup_at: "2025-06-12",
+          last_activity_at: "2025-08-03",
+          phone: "+1 202 555 0118",
+          location: "Miami, USA",
+        },
+        {
+          id: 8,
+          path: "profile-35.png",
+          name: "Traci Lopez",
+          email: "traci@mail.com",
+          status: "unsubscribed",
+          tags: ["Newsletter"],
+          source: "Import",
+          signup_at: "2025-05-22",
+          last_activity_at: "2025-07-01",
+          phone: "+44 202 555 0135",
+          location: "Edinburgh, UK",
+        },
+        {
+          id: 9,
+          path: "profile-35.png",
+          name: "Steven M.",
+          email: "sokol@verizon.net",
+          status: "subscribed",
+          tags: ["Lead", "Trial"],
+          source: "API",
+          signup_at: "2025-07-01",
+          last_activity_at: "2025-08-11",
+          phone: "+1 202 555 0100",
+          location: "Monrovia, US",
+        },
+        {
+          id: 10,
+          path: "profile-35.png",
+          name: "James Cantrell",
+          email: "sravani@comcast.net",
+          status: "subscribed",
+          tags: ["Customer"],
+          source: "Form",
+          signup_at: "2025-02-09",
+          last_activity_at: "2025-08-09",
+          phone: "+1 202 555 0134",
+          location: "Michigan, US",
+        },
+        {
+          id: 11,
+          path: "profile-35.png",
+          name: "Reginald Brown",
+          email: "drhyde@gmail.com",
+          status: "non-subscribed",
+          tags: ["Trial"],
+          source: "API",
+          signup_at: "2025-03-28",
+          last_activity_at: "2025-04-02",
+          phone: "+34 202 555 0153",
+          location: "Entrimo, Spain",
+        },
+        {
+          id: 12,
+          path: "profile-35.png",
+          name: "Stacey Smith",
+          email: "maikelnai@optonline.net",
+          status: "subscribed",
+          tags: ["Newsletter", "VIP"],
+          source: "Form",
+          signup_at: "2025-08-11",
+          last_activity_at: "2025-08-14",
+          phone: "+48 202 555 0115",
+          location: "Lublin, Poland",
+        },
+      ],
+
+      // Derived
+      get filtered() {
+        let items = this.contacts;
+
+        // search
+        const q = this.q.trim().toLowerCase();
+        if (q)
+          items = items.filter(
+            (c) =>
+              (c.name || "").toLowerCase().includes(q) ||
+              (c.email || "").toLowerCase().includes(q)
+          );
+
+        // status
+        if (this.filters.status) {
+          items = items.filter((c) => c.status === this.filters.status);
+        }
+
+        // segment (simple Mailchimp-like presets)
+        if (this.filters.segment === "recent") {
+          items = items.filter((c) => this.daysAgo(c.last_activity_at) <= 30);
+        } else if (this.filters.segment === "cold") {
+          items = items.filter((c) => this.daysAgo(c.last_activity_at) > 90);
+        } else if (this.filters.segment === "new") {
+          items = items.filter((c) => this.daysAgo(c.signup_at) <= 7);
+        }
+
+        // tags (AND)
+        if (this.filters.tags.length) {
+          items = items.filter((c) =>
+            this.filters.tags.every((t) => c.tags.includes(t))
+          );
+        }
+
+        // sort
+        items = [...items].sort((a, b) => {
+          const k = this.sort.key;
+          const av = (a[k] ?? "").toString().toLowerCase();
+          const bv = (b[k] ?? "").toString().toLowerCase();
+          if (av < bv) return this.sort.dir === "asc" ? -1 : 1;
+          if (av > bv) return this.sort.dir === "asc" ? 1 : -1;
+          return 0;
+        });
+
+        return items;
+      },
+
+      get totalPages() {
+        return Math.max(1, Math.ceil(this.filtered.length / this.perPage));
+      },
+      get pageItems() {
+        const start = (this.page - 1) * this.perPage;
+        return this.filtered.slice(start, start + this.perPage);
+      },
+      get fromRow() {
+        return this.filtered.length ? (this.page - 1) * this.perPage + 1 : 0;
+      },
+      get toRow() {
+        return Math.min(this.filtered.length, this.page * this.perPage);
+      },
+      get allOnPageSelected() {
+        return (
+          this.pageItems.length &&
+          this.pageItems.every((i) => this.selected.has(i.id))
+        );
+      },
+
+      // Form state
+      form: {
+        id: null,
+        name: "",
+        email: "",
+        phone: "",
+        status: "subscribed",
+        tagsCsv: "",
+        location: "",
+      },
+
+      // Methods
+      applyFilters() {
+        this.page = 1;
+      },
+      clearFilters() {
+        this.q = "";
+        this.filters = { status: "", segment: "", tags: [] };
+        this.tagToToggle = "";
+        this.page = 1;
+      },
+      toggleTagFilter() {
+        if (!this.tagToToggle) return;
+        const t = this.tagToToggle;
+        if (!this.filters.tags.includes(t)) this.filters.tags.push(t);
+        this.tagToToggle = "";
+        this.applyFilters();
+      },
+      removeTagFilter(t) {
+        this.filters.tags = this.filters.tags.filter((x) => x !== t);
+        this.applyFilters();
+      },
+
+      toggleAll(e) {
+        if (e.target.checked) {
+          this.pageItems.forEach((i) => this.selected.add(i.id));
+        } else {
+          this.pageItems.forEach((i) => this.selected.delete(i.id));
+        }
+      },
+      toggleOne(id, e) {
+        if (e.target.checked) this.selected.add(id);
+        else this.selected.delete(id);
+      },
+
+      sortBy(key) {
+        if (this.sort.key === key) {
+          this.sort.dir = this.sort.dir === "asc" ? "desc" : "asc";
+        } else {
+          this.sort.key = key;
+          this.sort.dir = "asc";
+        }
+      },
+
+      bulk(action) {
+        if (!this.selected.size) return;
+        const ids = new Set(this.selected);
+        if (action === "delete") {
+          this.contacts = this.contacts.filter((c) => !ids.has(c.id));
+        } else if (action === "unsubscribe") {
+          this.contacts = this.contacts.map((c) =>
+            ids.has(c.id) ? { ...c, status: "unsubscribed" } : c
+          );
+        } else if (action === "tag") {
+          const tag = prompt("Add tag name:");
+          if (tag) {
+            this.contacts = this.contacts.map((c) => {
+              if (!ids.has(c.id)) return c;
+              const tags = c.tags.includes(tag) ? c.tags : [...c.tags, tag];
+              if (!this.allTags.includes(tag)) this.allTags.push(tag);
+              return { ...c, tags };
+            });
+          }
+        }
+        this.selected.clear();
+        this.toast("Bulk action completed.");
+      },
+
+      openAdd() {
+        this.form = {
+          id: null,
+          name: "",
+          email: "",
+          phone: "",
+          status: "subscribed",
+          tagsCsv: "",
+          location: "",
+        };
+        this.modal = true;
+      },
+      openEdit(c) {
+        this.form = {
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          phone: c.phone,
+          status: c.status,
+          tagsCsv: (c.tags || []).join(", "),
+          location: c.location || "",
+        };
+        this.modal = true;
+      },
+      closeModal() {
+        this.modal = false;
+      },
+
+      save() {
+        // basic validation
+        if (!this.form.name) return this.toast("Name is required", "error");
+        if (!this.form.email) return this.toast("Email is required", "error");
+
+        const tags = (this.form.tagsCsv || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+        if (this.form.id) {
+          // update
+          this.contacts = this.contacts.map((c) =>
+            c.id === this.form.id
+              ? {
+                  ...c,
+                  name: this.form.name,
+                  email: this.form.email,
+                  phone: this.form.phone,
+                  status: this.form.status,
+                  tags,
+                  location: this.form.location,
+                }
+              : c
+          );
+        } else {
+          const maxId = this.contacts.reduce((m, c) => Math.max(m, c.id), 0);
+          this.contacts.unshift({
+            id: maxId + 1,
+            path: "profile-35.png",
+            name: this.form.name,
+            email: this.form.email,
+            phone: this.form.phone,
+            status: this.form.status,
+            tags,
+            source: "Form",
+            signup_at: new Date().toISOString().slice(0, 10),
+            last_activity_at: new Date().toISOString().slice(0, 10),
+            location: this.form.location,
+          });
+        }
+        // add new tags to tag list
+        tags.forEach((t) => {
+          if (!this.allTags.includes(t)) this.allTags.push(t);
+        });
+
+        this.modal = false;
+        this.toast("Contact saved.");
+      },
+
+      remove(c) {
+        if (!confirm("Delete this contact?")) return;
+        this.contacts = this.contacts.filter((x) => x.id !== c.id);
+        this.selected.delete(c.id);
+        this.toast("Contact deleted.");
+      },
+
+      // helpers
+      statusClass(s) {
+        const base = "px-2.5 py-0.5 rounded-full text-xs";
+        if (s === "subscribed")
+          return (
+            base +
+            " bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+          );
+        if (s === "unsubscribed")
+          return (
+            base +
+            " bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+          );
+        if (s === "cleaned")
+          return (
+            base +
+            " bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
+          );
+        return (
+          base +
+          " bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        );
+      },
+      cap(s) {
+        return (s || "").replace(/(^.|[-_\s].)/g, (x) => x.toUpperCase());
+      },
+      fmtDate(s) {
+        if (!s) return "—";
+        const d = new Date(s);
+        return d.toLocaleDateString();
+      },
+      daysAgo(s) {
+        const d = new Date(s);
+        return Math.floor((Date.now() - d) / 86400000);
+      },
+      toast(msg = "", type = "success") {
+        if (window.Swal) {
+          const t = window.Swal.mixin({
+            toast: true,
+            position: "top",
+            showConfirmButton: false,
+            timer: 2500,
+          });
+          t.fire({ icon: type, title: msg, padding: "10px 20px" });
+        } else {
+          console.log(type.toUpperCase() + ":", msg);
+        }
+      },
+
+      init() {
+        /* nothing else needed; computed props handle view */
+      },
+    }));
+  });
+</script>
+
+
+
+{% endblock %}

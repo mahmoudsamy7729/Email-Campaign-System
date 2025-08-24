@@ -1,0 +1,32 @@
+{% extends "account/email/base_email.html" %} {% load account %} {% load i18n %} {% block content %}
+<table border="0" cellpadding="20" cellspacing="0" width="100%">
+  <tr>
+    <td valign="top" class="bodyContent">
+      <div mc:edit="std_content00">
+        <h2 class="h2">Account already exists</h2>
+        {% include "account/email/base_message.html" %}
+        <br />
+        {% autoescape off %}{% blocktrans %}You are receiving this email because
+        you or someone else tried to signup for an account using email address:
+        <br />
+        {{ email }}
+        <br />
+        However, an account using that email address already exists. In case you
+        have forgotten about this, please use the password forgotten procedure
+        to recover your account:
+        <br />
+        {{ password_reset_url }}{% endblocktrans %}{% endautoescape %}
+      </div>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top" class="bodyContent">
+      <div mc:edit="std_content00">
+        {% include "account/email/base_message_footer.html" %}
+      </div>
+    </td>
+  </tr>
+  {% endautoescape %}
+</table>
+
+{% endblock %} {% block footer %} {% include "account/email/base_footer.html" %} {% endblock %}
