@@ -33,8 +33,8 @@ def tables(request):
 def campaigns(request):
     return render(request, 'apps/campaigns.html')
 
-def apps_mailbox(request):
-    return render(request, 'apps/mailbox.html')
+def apps_audiences(request):
+    return render(request, 'apps/audiences.html')
 
 def apps_todolist(request):
     return render(request, 'apps/todolist.html')

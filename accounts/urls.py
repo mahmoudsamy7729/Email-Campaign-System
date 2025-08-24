@@ -8,7 +8,7 @@ urlpatterns = [
     path('crypto', views.crypto, name='crypto'),
 
     path('apps/campaigns', views.campaigns, name='campaigns'),
-    path('apps/mailbox', views.apps_mailbox, name='mailbox'),
+    path('apps/audiences', views.apps_audiences, name='audiences'),
     path('apps/todolist', views.apps_todolist, name='todolist'),
     path('apps/notes', views.apps_notes, name='notes'),
     path('apps/contacts', views.apps_contacts, name='contacts'),

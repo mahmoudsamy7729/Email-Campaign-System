@@ -30,6 +30,11 @@ DEBUG = config("DEBUG")
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
+INTERNAL_IPS = [
+        '127.0.0.1',
+        'localhost',
+    ]
+
 
 # Application definition
 
@@ -52,6 +57,11 @@ INSTALLED_APPS = [
     # Virsto
     'tailwind',
     'vristoDjango',
+    #Django Rest Framework
+    "rest_framework",
+    "django_filters",
+    'debug_toolbar',
+    "django_extensions",  
 
 ]
 
@@ -89,6 +99,22 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE")
 SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE")
 
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",  # works with Django login
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",  # change to AllowAny if you want public read
+    ],
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+}
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -98,6 +124,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'

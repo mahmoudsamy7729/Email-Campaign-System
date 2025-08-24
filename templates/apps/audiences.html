@@ -1,0 +1,946 @@
+{% extends 'components/layouts/default.html' %} {% load static %} 
+{% block content %}
+
+<div x-data="campaigns()" class="space-y-6">
+  <!-- Header -->
+  <div class="flex items-start justify-between flex-wrap gap-4">
+    <div>
+      <h2 class="text-2xl font-semibold">Campaigns</h2>
+      <p class="text-white-dark text-sm">
+        Create, schedule, and track email campaigns.
+      </p>
+    </div>
+    <div class="flex gap-2">
+      <button
+        type="button"
+        class="btn btn-outline-primary"
+        @click="openCreate('regular')"
+      >
+        Create
+      </button>
+      <div class="relative" x-data="{open:false}">
+        <button class="btn btn-primary" @click="open=!open">
+          Create campaign
+        </button>
+        <div
+          x-show="open"
+          @click.outside="open=false"
+          class="absolute right-0 mt-2 w-56 panel p-2 z-10"
+          x-cloak
+        >
+          <button
+            class="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#111827]"
+            @click="open=false; openCreate('regular')"
+          >
+            Regular email
+          </button>
+          <button
+            class="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#111827]"
+            @click="open=false; openCreate('ab')"
+          >
+            A/B test
+          </button>
+          <button
+            class="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#111827]"
+            @click="open=false; openCreate('automation')"
+          >
+            Automation
+          </button>
+          <button
+            class="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#111827]"
+            @click="open=false; openCreate('rss')"
+          >
+            RSS campaign
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex flex-wrap items-center gap-2 border-b pb-2">
+    <button
+      class="btn btn-outline-primary"
+      :class="tab==='all' && 'bg-primary text-white'"
+      @click="setTab('all')"
+    >
+      All
+    </button>
+    <button
+      class="btn btn-outline-primary"
+      :class="tab==='draft' && 'bg-primary text-white'"
+      @click="setTab('draft')"
+    >
+      Drafts
+    </button>
+    <button
+      class="btn btn-outline-primary"
+      :class="tab==='scheduled' && 'bg-primary text-white'"
+      @click="setTab('scheduled')"
+    >
+      Scheduled
+    </button>
+    <button
+      class="btn btn-outline-primary"
+      :class="tab==='sent' && 'bg-primary text-white'"
+      @click="setTab('sent')"
+    >
+      Sent
+    </button>
+    <div class="ml-auto flex items-center gap-2">
+      <div class="relative">
+        <input
+          type="text"
+          class="form-input py-2 ltr:pr-10 rtl:pl-10 w-72"
+          placeholder="Search campaigns"
+          x-model="q"
+          @input.debounce.300ms="applyFilters"
+        />
+        <div
+          class="absolute ltr:right-[11px] rtl:left-[11px] top-1/2 -translate-y-1/2 peer-focus:text-primary"
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            class="w-4 h-4"
+          >
+            <circle
+              cx="11.5"
+              cy="11.5"
+              r="9.5"
+              stroke="currentColor"
+              stroke-width="1.5"
+              opacity="0.5"
+            ></circle>
+            <path
+              d="M18.5 18.5L22 22"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            ></path>
+          </svg>
+        </div>
+      </div>
+      <select
+        class="form-input py-2 w-44"
+        x-model="filters.type"
+        @change="applyFilters"
+      >
+        <option value="">All types</option>
+        <option value="regular">Regular</option>
+        <option value="ab">A/B test</option>
+        <option value="automation">Automation</option>
+        <option value="rss">RSS</option>
+      </select>
+      <select
+        class="form-input py-2 w-44"
+        x-model="filters.audience"
+        @change="applyFilters"
+      >
+        <option value="">All audiences</option>
+        <template x-for="a in audiences" :key="a"
+          ><option :value="a" x-text="a"></option
+        ></template>
+      </select>
+      <button class="btn btn-outline-danger" @click="clearFilters">
+        Reset
+      </button>
+    </div>
+  </div>
+
+  <!-- Bulk actions -->
+  <div class="flex items-center gap-3">
+    <div class="text-sm text-white-dark" x-show="selected.size">
+      Selected: <span x-text="selected.size"></span>
+    </div>
+    <div class="relative" x-data="{open:false}">
+      <button
+        class="btn btn-outline-primary"
+        :class="{'opacity-50 pointer-events-none': selected.size===0}"
+        @click="open=!open"
+      >
+        Bulk actions
+      </button>
+      <div
+        x-show="open"
+        @click.outside="open=false"
+        class="absolute mt-2 w-56 panel p-2 z-10"
+      >
+        <button
+          class="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#111827]"
+          @click="bulk('schedule'); open=false"
+        >
+          Schedule
+        </button>
+        <button
+          class="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#111827]"
+          @click="bulk('pause'); open=false"
+        >
+          Pause
+        </button>
+        <button
+          class="w-full text-left px-3 py-2 text-danger hover:bg-gray-50 dark:hover:bg-[#111827]"
+          @click="bulk('delete'); open=false"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="panel p-0 border-0 overflow-visible relative">
+    <div class="table-responsive" style="overflow-x: auto; overflow-y: visible">
+      <table class="table-striped table-hover">
+        <thead>
+          <tr>
+            <th class="!w-10">
+              <input
+                type="checkbox"
+                @change="toggleAll($event)"
+                :checked="allOnPageSelected"
+              />
+            </th>
+            <th @click="sortBy('name')" class="cursor-pointer">Name</th>
+            <th @click="sortBy('contacts_count')" class="cursor-pointer">Contacts Count</th>
+            <th @click="sortBy('created_at')" class="cursor-pointer">Created At</th>
+            <th class="!text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="c in pageItems" :key="c.id">
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  :value="c.id"
+                  @change="toggleOne(c.id, $event)"
+                  :checked="selected.has(c.id)"
+                />
+              </td>
+              <td>
+                <div class="flex flex-col">
+                  <a
+                    :href="`{% url "audience:contact-list" %}?audience=${c.id}`"
+                    class="font-medium hover:underline"
+                    x-text="c.name"
+                  ></a>
+                </div>
+              </td>
+              <td x-text="(c.contacts_count ?? 0).toLocaleString()"></td>
+              <td x-text="fmtDatetime(c.created_at)"></td>
+              <td class="!text-center">
+                <div
+                  class="relative inline-block"
+                  x-data="{
+      open:false, w:192, top:0, left:0,
+      // compute ideal position relative to viewport (fixed)
+      reposition() {
+        const r = $refs.btn.getBoundingClientRect();
+        // default: right-aligned, below the button
+        let L = r.right - this.w;
+        let T = r.bottom + 8;
+
+        // keep inside viewport horizontally
+        const vw = document.documentElement.clientWidth;
+        if (L < 8) L = 8;
+        if (L + this.w > vw - 8) L = vw - this.w - 8;
+
+        // If there isn't enough space below, flip above
+        const menuH = ($refs.menu && $refs.menu.getBoundingClientRect().height) || 0;
+        const spaceBelow = window.innerHeight - r.bottom;
+        if (menuH && spaceBelow < menuH + 12) {
+          T = r.top - menuH - 8;
+          if (T < 8) T = Math.max(8, r.top + 8); // last resort
+        }
+
+        this.left = L;
+        this.top  = T;
+      },
+      toggle() {
+        this.open = !this.open;
+        this.$nextTick(() => { this.reposition(); });
+      },
+      close(){ this.open = false; }
+    }"
+                  x-init="
+      // Reposition while open on any scroll (capture catches inner scrollers)
+      (()=>{
+        const f = ()=>{ if (open) reposition(); };
+        window.addEventListener('scroll', f, {capture:true, passive:true});
+        window.addEventListener('resize', f, {passive:true});
+      })()
+    "
+                  @keydown.escape.window="close()"
+                >
+                  <button
+                    x-ref="btn"
+                    class="btn btn-sm btn-outline-primary"
+                    @click.prevent="toggle()"
+                  >
+                    Manage
+                  </button>
+
+                  <!-- Portaled dropdown -->
+                  <template x-teleport="body">
+                    <div
+                      x-cloak
+                      x-show="open"
+                      x-transition
+                      x-ref="menu"
+                      class="fixed z-[2147483647] overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#111827] shadow-xl"
+                      :style="`top:${top}px;left:${left}px;width:${w}px;`"
+                      @click.outside.window="close()"
+                    >
+                      <a
+                        :href="`/campaigns/${c.id}/edit`"
+                        class="block px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#0f172a]"
+                        >Edit</a
+                      >
+                      <button
+                        class="block w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#0f172a]"
+                        x-show="c.status==='draft'"
+                        @click="close(); schedule(c)"
+                      >
+                        Schedule
+                      </button>
+                      <button
+                        class="block w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#0f172a]"
+                        x-show="c.status==='scheduled' || c.status==='sending'"
+                        @click="close(); pause(c)"
+                      >
+                        Pause
+                      </button>
+                      <button
+                        class="block w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#0f172a]"
+                        x-show="c.status==='paused'"
+                        @click="close(); resume(c)"
+                      >
+                        Resume
+                      </button>
+                      <a
+                        :href="`/campaigns/${c.id}/duplicate`"
+                        class="block px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#0f172a]"
+                        >Duplicate</a
+                      >
+                      <a
+                        :href="`/campaigns/${c.id}/report`"
+                        class="block px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#0f172a]"
+                        >View report</a
+                      >
+                      <button
+                        class="block w-full text-left px-3 py-2 text-danger hover:bg-gray-50 dark:hover:bg-[#0f172a]"
+                        @click="close(); remove(c)"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="!pageItems.length">
+            <td colspan="9" class="text-center py-10 text-white-dark">
+              No campaigns match your filters.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between px-4 py-3 border-t">
+      <div class="text-sm text-white-dark">
+        Showing <span x-text="fromRow"></span>–<span x-text="toRow"></span> of
+        <span x-text="filtered.length"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          class="btn btn-outline-primary"
+          :disabled="page===1"
+          @click="page--"
+        >
+          Prev
+        </button>
+        <div class="text-sm">
+          Page <span x-text="page"></span> / <span x-text="totalPages"></span>
+        </div>
+        <button
+          class="btn btn-outline-primary"
+          :disabled="page===totalPages"
+          @click="page++"
+        >
+          Next
+        </button>
+        <select
+          class="form-input py-1 w-24"
+          x-model.number="perPage"
+          @change="page=1"
+        >
+          <option :value="10">10</option>
+          <option :value="25">25</option>
+          <option :value="50">50</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create/Edit Modal -->
+  <div
+    class="fixed inset-0 bg-[black]/60 z-[999] overflow-y-auto"
+    x-show="modal"
+    x-transition
+    x-cloak
+  >
+    <div
+      class="flex items-center justify-center min-h-screen px-4"
+      @click.self="closeModal()"
+    >
+      <div
+        class="panel border-0 p-0 rounded-lg overflow-hidden md:w-full max-w-xl w-[90%] my-8"
+      >
+        <button
+          type="button"
+          class="absolute top-4 ltr:right-4 rtl:left-4 text-white-dark hover:text-dark"
+          @click="closeModal()"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24px"
+            height="24px"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+        <h3
+          class="text-lg font-medium bg-[#fbfbfb] dark:bg-[#121c2c] ltr:pl-5 rtl:pr-5 py-3 ltr:pr-[50px] rtl:pl-[50px]"
+          x-text="form.id ? 'Edit campaign' : 'Create campaign'"
+        ></h3>
+        <div class="p-5">
+          <form @submit.prevent="save()">
+            <div class="grid grid-cols-1 gap-4">
+              <div>
+                <label>Campaign name</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  placeholder="August newsletter"
+                  x-model="form.name"
+                />
+              </div>
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label>Type</label>
+                  <select class="form-input" x-model="form.type">
+                    <option value="regular">Regular</option>
+                    <option value="ab">A/B test</option>
+                    <option value="automation">Automation</option>
+                    <option value="rss">RSS</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Audience</label>
+                  <select class="form-input" x-model="form.audience">
+                    <template x-for="a in audiences" :key="a"
+                      ><option :value="a" x-text="a"></option
+                    ></template>
+                  </select>
+                </div>
+              </div>
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label>From name</label>
+                  <input
+                    type="text"
+                    class="form-input"
+                    x-model="form.from_name"
+                    placeholder="Your brand"
+                  />
+                </div>
+                <div>
+                  <label>From email</label>
+                  <input
+                    type="email"
+                    class="form-input"
+                    x-model="form.from_email"
+                    placeholder="noreply@domain.com"
+                  />
+                </div>
+              </div>
+              <div>
+                <label>Subject line</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  x-model="form.subject"
+                  placeholder="This month’s updates ✨"
+                />
+              </div>
+              <div
+                x-show="form.type==='scheduled'"
+                class="grid sm:grid-cols-2 gap-4"
+              >
+                <div>
+                  <label>Send date</label>
+                  <input
+                    type="date"
+                    class="form-input"
+                    x-model="form.send_date"
+                  />
+                </div>
+                <div>
+                  <label>Send time</label>
+                  <input
+                    type="time"
+                    class="form-input"
+                    x-model="form.send_time"
+                  />
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-end items-center mt-6">
+              <button
+                type="button"
+                class="btn btn-outline-danger"
+                @click="closeModal()"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                class="btn btn-primary ltr:ml-3 rtl:mr-3"
+                x-text="form.id ? 'Update' : 'Create'"
+              ></button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("campaigns", () => ({
+      // UI state
+      tab: "all",
+      q: "",
+      filters: { type: "", audience: "" },
+      audiences: ["All subscribers", "VIP Customers", "Leads", "Newsletter"],
+      selected: new Set(),
+      page: 1,
+      perPage: 10,
+      sort: { key: "updated_at", dir: "desc" },
+      modal: false,
+
+      // Data (sample)
+      items: [
+        {
+          id: 1,
+          name: "August Newsletter",
+          type: "regular",
+          status: "draft",
+          recipients: 12450,
+          open_rate: 0.0,
+          click_rate: 0.0,
+          audience: "Newsletter",
+          updated_at: "2025-08-13T18:30:00",
+          send_at: null,
+          sent_at: null,
+        },
+        {
+          id: 2,
+          name: "Summer Sale — 48h",
+          type: "ab",
+          status: "scheduled",
+          recipients: 8200,
+          open_rate: 0.0,
+          click_rate: 0.0,
+          audience: "All subscribers",
+          updated_at: "2025-08-14T09:00:00",
+          send_at: "2025-08-15T10:00:00",
+          sent_at: null,
+        },
+        {
+          id: 3,
+          name: "Onboarding Series Day 1",
+          type: "automation",
+          status: "active",
+          recipients: 230,
+          open_rate: 0.51,
+          click_rate: 0.12,
+          audience: "Leads",
+          updated_at: "2025-08-12T12:10:00",
+          send_at: null,
+          sent_at: null,
+        },
+        {
+          id: 4,
+          name: "Product Updates July",
+          type: "regular",
+          status: "sent",
+          recipients: 9700,
+          open_rate: 0.39,
+          click_rate: 0.08,
+          audience: "All subscribers",
+          updated_at: "2025-08-01T15:00:00",
+          send_at: null,
+          sent_at: "2025-08-01T15:00:00",
+        },
+        {
+          id: 5,
+          name: "Blog Digest (RSS)",
+          type: "rss",
+          status: "active",
+          recipients: 4100,
+          open_rate: 0.34,
+          click_rate: 0.06,
+          audience: "Newsletter",
+          updated_at: "2025-08-10T08:00:00",
+          send_at: null,
+          sent_at: null,
+        },
+        {
+          id: 6,
+          name: "VIP Exclusive — Sept Tease",
+          type: "regular",
+          status: "paused",
+          recipients: 1200,
+          open_rate: 0.0,
+          click_rate: 0.0,
+          audience: "VIP Customers",
+          updated_at: "2025-08-11T10:25:00",
+          send_at: "2025-08-20T09:00:00",
+          sent_at: null,
+        },
+        {
+          id: 7,
+          name: "Winback — 90 days",
+          type: "automation",
+          status: "active",
+          recipients: 540,
+          open_rate: 0.45,
+          click_rate: 0.11,
+          audience: "Leads",
+          updated_at: "2025-08-09T11:40:00",
+          send_at: null,
+          sent_at: null,
+        },
+        {
+          id: 8,
+          name: "July Flash Sale",
+          type: "ab",
+          status: "sent",
+          recipients: 15000,
+          open_rate: 0.42,
+          click_rate: 0.15,
+          audience: "All subscribers",
+          updated_at: "2025-07-20T14:10:00",
+          send_at: null,
+          sent_at: "2025-07-20T14:10:00",
+        },
+      ],
+
+      /* === Derived === */
+      get filtered() {
+        let rows = this.items;
+
+        // tab
+        if (this.tab !== "all") {
+          if (this.tab === "sent")
+            rows = rows.filter((r) => r.status === "sent");
+          else if (this.tab === "scheduled")
+            rows = rows.filter((r) => r.status === "scheduled");
+          else if (this.tab === "draft")
+            rows = rows.filter((r) => r.status === "draft");
+        }
+
+        // search
+        const q = this.q.trim().toLowerCase();
+        if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q));
+
+        // filters
+        if (this.filters.type)
+          rows = rows.filter((r) => r.type === this.filters.type);
+        if (this.filters.audience)
+          rows = rows.filter((r) => r.audience === this.filters.audience);
+
+        // sort
+        rows = [...rows].sort((a, b) => {
+          const k = this.sort.key;
+          const av = this.sortValue(a, k);
+          const bv = this.sortValue(b, k);
+          if (av < bv) return this.sort.dir === "asc" ? -1 : 1;
+          if (av > bv) return this.sort.dir === "asc" ? 1 : -1;
+          return 0;
+        });
+
+        return rows;
+      },
+      get totalPages() {
+        return Math.max(1, Math.ceil(this.filtered.length / this.perPage));
+      },
+      get pageItems() {
+        const s = (this.page - 1) * this.perPage;
+        return this.filtered.slice(s, s + this.perPage);
+      },
+      get fromRow() {
+        return this.filtered.length ? (this.page - 1) * this.perPage + 1 : 0;
+      },
+      get toRow() {
+        return Math.min(this.filtered.length, this.page * this.perPage);
+      },
+      get allOnPageSelected() {
+        return (
+          this.pageItems.length &&
+          this.pageItems.every((i) => this.selected.has(i.id))
+        );
+      },
+
+      /* === Actions === */
+      setTab(t) {
+        this.tab = t;
+        this.page = 1;
+      },
+      applyFilters() {
+        this.page = 1;
+      },
+      clearFilters() {
+        this.q = "";
+        this.filters = { type: "", audience: "" };
+        this.page = 1;
+      },
+
+      toggleAll(e) {
+        if (e.target.checked) {
+          this.pageItems.forEach((i) => this.selected.add(i.id));
+        } else {
+          this.pageItems.forEach((i) => this.selected.delete(i.id));
+        }
+      },
+      toggleOne(id, e) {
+        if (e.target.checked) this.selected.add(id);
+        else this.selected.delete(id);
+      },
+
+      sortBy(key) {
+        if (this.sort.key === key)
+          this.sort.dir = this.sort.dir === "asc" ? "desc" : "asc";
+        else {
+          this.sort.key = key;
+          this.sort.dir = "asc";
+        }
+      },
+
+      bulk(action) {
+        const ids = new Set(this.selected);
+        if (!ids.size) return;
+        if (action === "delete")
+          this.items = this.items.filter((r) => !ids.has(r.id));
+        if (action === "schedule")
+          this.items = this.items.map((r) =>
+            ids.has(r.id)
+              ? { ...r, status: "scheduled", send_at: this.isoIn(1) }
+              : r
+          );
+        if (action === "pause")
+          this.items = this.items.map((r) =>
+            ids.has(r.id) ? { ...r, status: "paused" } : r
+          );
+        this.selected.clear();
+        this.toast("Bulk action completed.");
+      },
+
+      openCreate(type) {
+        this.form = {
+          id: null,
+          name: "",
+          type: type || "regular",
+          audience: this.audiences[0],
+          from_name: "",
+          from_email: "",
+          subject: "",
+          send_date: "",
+          send_time: "",
+        };
+        this.modal = true;
+      },
+      closeModal() {
+        this.modal = false;
+      },
+      schedule(c) {
+        c.status = "scheduled";
+        c.send_at = this.isoIn(1);
+        c.updated_at = new Date().toISOString();
+        this.toast("Scheduled.");
+      },
+      pause(c) {
+        c.status = "paused";
+        c.updated_at = new Date().toISOString();
+        this.toast("Paused.");
+      },
+      resume(c) {
+        c.status = "scheduled";
+        c.updated_at = new Date().toISOString();
+        this.toast("Resumed.");
+      },
+      remove(c) {
+        if (!confirm("Delete this campaign?")) return;
+        this.items = this.items.filter((x) => x.id !== c.id);
+        this.selected.delete(c.id);
+        this.toast("Deleted.");
+      },
+
+      save() {
+        // basic validation
+        if (!this.form.name)
+          return this.toast("Campaign name is required", "error");
+        if (!this.form.from_email)
+          return this.toast("From email is required", "error");
+
+        if (this.form.id) {
+          // update
+          this.items = this.items.map((r) =>
+            r.id === this.form.id
+              ? { ...r, ...this.form, updated_at: new Date().toISOString() }
+              : r
+          );
+        } else {
+          const maxId = this.items.reduce((m, r) => Math.max(m, r.id), 0);
+          const sendAt =
+            this.form.send_date && this.form.send_time
+              ? this.combineDateTime(this.form.send_date, this.form.send_time)
+              : null;
+          this.items.unshift({
+            id: maxId + 1,
+            name: this.form.name,
+            type: this.form.type,
+            status: sendAt ? "scheduled" : "draft",
+            recipients: 0,
+            open_rate: 0,
+            click_rate: 0,
+            audience: this.form.audience,
+            updated_at: new Date().toISOString(),
+            send_at: sendAt,
+            sent_at: null,
+          });
+        }
+        this.modal = false;
+        this.toast("Saved.");
+      },
+
+      /* === Helpers === */
+      form: {
+        id: null,
+        name: "",
+        type: "regular",
+        audience: "All subscribers",
+        from_name: "",
+        from_email: "",
+        subject: "",
+        send_date: "",
+        send_time: "",
+      },
+
+      sortValue(row, key) {
+        if (key === "open_rate" || key === "click_rate") return row[key] ?? 0;
+        if (key === "recipients") return row[key] ?? 0;
+        if (key === "updated_at") return new Date(row.updated_at).getTime();
+        return (row[key] ?? "").toString().toLowerCase();
+      },
+
+      typeLabel(t) {
+        if (t === "ab") return "A/B Test";
+        if (t === "rss") return "RSS";
+        return t.charAt(0).toUpperCase() + t.slice(1);
+      },
+      typeBadge(t) {
+        const base =
+          "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
+        if (t === "regular")
+          return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200";
+        if (t === "ab")
+          return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200";
+        if (t === "automation")
+          return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200";
+        if (t === "rss")
+          return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200";
+        return base;
+      },
+      statusBadge(s) {
+        if (s === "draft")
+          return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+        if (s === "scheduled")
+          return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200";
+        if (s === "sent")
+          return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200";
+        if (s === "paused")
+          return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200";
+        if (s === "active")
+          return "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200";
+        if (s === "sending")
+          return "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200";
+        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+      },
+      cap(s) {
+        return (s || "").replace(/(^.|[-_\s].)/g, (x) => x.toUpperCase());
+      },
+      pct(n) {
+        return (n * 100).toFixed(0) + "%";
+      },
+      fmtDatetime(s) {
+        if (!s) return "—";
+        const d = new Date(s);
+        return d.toLocaleString();
+      },
+      isoIn(days) {
+        const d = new Date(Date.now() + days * 86400000);
+        return d.toISOString();
+      },
+      combineDateTime(dateStr, timeStr) {
+        const d = new Date(`${dateStr}T${timeStr}:00`);
+        return d.toISOString();
+      },
+
+      toast(msg = "", type = "success") {
+        if (window.Swal) {
+          const t = window.Swal.mixin({
+            toast: true,
+            position: "top",
+            showConfirmButton: false,
+            timer: 2500,
+          });
+          t.fire({ icon: type, title: msg, padding: "10px 20px" });
+        } else {
+          console.log(type.toUpperCase() + ":", msg);
+        }
+      },
+
+      async init() {
+  try {
+    const res = await fetch('/api/audience/audiences/', {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin', // if using session auth
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();        // <-- call it
+    this.items = Array.isArray(data) ? data : (data.results || data.data || []);
+  } catch (err) {
+    console.error(err);
+    this.toast('Failed to load audiences', 'error');
+  }
+}
+    }));
+  });
+</script>
+
+{% endblock %}

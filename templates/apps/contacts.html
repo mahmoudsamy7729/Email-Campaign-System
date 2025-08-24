@@ -454,6 +454,10 @@
     </div>
   </div>
 </div>
+<script>
+fetch("/api/audience/contacts/?audience=a4b78b5a-d560-4367-9d89-0dee0ab79b19")
+  .then(r => r.json()).then(console.log)
+</script>
 
 <script>
   document.addEventListener("alpine:init", () => {
@@ -914,5 +918,7 @@
     }));
   });
 </script>
+
+
 
 {% endblock %}
