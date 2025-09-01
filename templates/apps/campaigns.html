@@ -307,6 +307,7 @@
     </div>
 </div>
 
+
 <script>
     document.addEventListener("alpine:init", () => {
         Alpine.data("campaigns", () => ({
@@ -576,6 +577,7 @@
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie("csrftoken"),
                         },
                         body: JSON.stringify(this.params)
                     });
@@ -595,6 +597,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
+                            "X-CSRFToken": getCookie("csrftoken"),
                         },
                         body: JSON.stringify(this.params)
                     });
@@ -652,6 +655,7 @@
             },
         }));
     });
+    
 </script>
 
 {% endblock %}
