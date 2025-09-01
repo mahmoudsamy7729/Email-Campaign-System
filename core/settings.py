@@ -28,7 +28,7 @@ SECRET_KEY = config("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG")
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', ]
 
 INTERNAL_IPS = [
         '127.0.0.1',
@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     # Apps
     "accounts",
     "audience",
+    "campaign",
+    "tracking",
     # Virsto
     'tailwind',
     'vristoDjango',
@@ -247,3 +249,17 @@ LOGGING = {
 
 TAILWIND_APP_NAME = 'vristoDjango'
 TAILWIND_CSS_PATH = 'assets/css/styles.css'
+
+
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1   # fair sharing
+CELERY_TASK_ACKS_LATE = True           # safer if a worker dies mid-task
+CELERY_BROKER_URL = "redis://redis:6379/0"
+CELERY_RESULT_BACKEND = "redis://redis:6379/1"  # optional if you want statuses
+CELERY_TIMEZONE = "Africa/Cairo"
+
+
+TRACKING_BASE_URL = config("TRACKING_BASE_URL", "http://localhost:8000")
+TRACKING_LINK_CACHE_TTL = config("TRACKING_LINK_CACHE_TTL", 86400, cast=int)  
+TRACKING_DEDUPE_TTL = config("TRACKING_DEDUPE_TTL", 5, cast=int)  
+TRACKING_BOT_UA = tuple(config("TRACKING_BOT_UA", default="").split(","))
+

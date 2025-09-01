@@ -18,12 +18,15 @@
 
     <link rel='stylesheet' type='text/css' media='screen' href="{% static 'assets/css/perfect-scrollbar.min.css' %}" />
     <link defer rel='stylesheet' type='text/css' media='screen' href="{% static 'assets/css/animate.css' %}" />
-    <link rel='stylesheet' type='text/css' media='screen' href="{% static 'assets/css/styles.css' %}">
-
+    <link rel='stylesheet' type='text/css' media='screen' href="{% static 'assets/css/styles.css' %}" />
     <script src="{% static 'assets/js/perfect-scrollbar.min.js' %}"></script>
     <script defer src="{% static 'assets/js/popper.min.js' %}"></script>
     <script defer src="{% static 'assets/js/tippy-bundle.umd.min.js' %}"></script>
     <script defer src="{% static 'assets/js/sweetalert.min.js' %}"></script>
+
+    <script>
+        window.APP_URL = "http://localhost:8000/api";
+    </script>
     <style>[x-cloak]{ display:none !important; }</style>
 
 
@@ -119,12 +122,14 @@
         </div>
     </div>
 
+
     <script src="{% static 'assets/js/alpine-collaspe.min.js' %}"></script>
     <script src="{% static 'assets/js/alpine-persist.min.js' %}"></script>
     <script defer src="{% static 'assets/js/alpine.min.js' %}"></script>
     <script src="{% static 'assets/js/custom.js' %}"></script>
     <script defer src="{% static 'assets/js/alpine-ui.min.js' %}"></script>
     <script defer src="{% static 'assets/js/alpine-focus.min.js' %}"></script>
+
 
 </body>
 

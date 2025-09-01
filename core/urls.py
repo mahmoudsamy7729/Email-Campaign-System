@@ -19,6 +19,8 @@ from django.urls import path, include
 from django.views.generic import TemplateView
 from accounts.views import index
 from django.conf import settings
+from tracking.views import click_redirect
+
 
 
 urlpatterns = [
@@ -27,6 +29,8 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),  # signup/login/verify/reset
     path("home/", TemplateView.as_view(template_name="home.html"), name="home"),
     path("api/", include(("audience.urls", "audience"), namespace="audience")),
+    path("api/", include(("campaign.urls", "campaign"), namespace="campaign")),
+    path("c/<str:token>", click_redirect, name="click_redirect"),
 
 ]
 

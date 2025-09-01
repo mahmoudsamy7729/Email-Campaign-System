@@ -7,8 +7,9 @@ urlpatterns = [
     path('finance', views.finance, name='finance'),
     path('crypto', views.crypto, name='crypto'),
 
-    path('apps/campaigns', views.campaigns, name='campaigns'),
-    path('apps/audiences', views.apps_audiences, name='audiences'),
+    path('campaigns', views.campaigns, name='campaigns'),
+    path('campaigns/update/', views.update_campaign, name='update_campaign'),
+    path('audiences', views.apps_audiences, name='audiences'),
     path('apps/todolist', views.apps_todolist, name='todolist'),
     path('apps/notes', views.apps_notes, name='notes'),
     path('apps/contacts', views.apps_contacts, name='contacts'),

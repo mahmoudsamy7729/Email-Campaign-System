@@ -33,6 +33,9 @@ def tables(request):
 def campaigns(request):
     return render(request, 'apps/campaigns.html')
 
+def update_campaign(request):
+    return render(request, 'apps/update-campagin.html')
+
 def apps_audiences(request):
     return render(request, 'apps/audiences.html')
 
