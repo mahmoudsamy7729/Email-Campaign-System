@@ -7,6 +7,7 @@ from campaign.services import campaigns
 
 class CampaignSerializer(serializers.ModelSerializer):
     audience_name = serializers.CharField(source="audience.name", read_only=True)
+    test_email = serializers.EmailField(write_only=True, required=False)
 
     class Meta:
         model = Campaign

@@ -12,6 +12,7 @@ from audience.services import services
 class AudienceViewSet(viewsets.ModelViewSet):
     queryset = Audience.objects.annotate(contacts_count = Count('contacts')).all()
     permission_classes = [AllowAny]
+    pagination_class = None  # Disable pagination
 
     def get_queryset(self) -> QuerySet[Audience]:
         queryset = super().get_queryset()

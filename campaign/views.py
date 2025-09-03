@@ -38,7 +38,7 @@ class CampaignViewSet(viewsets.ModelViewSet):
             compile_result = services.compile_links(campaign)
 
         headers = self.get_success_headers(serializer.data)
-        payload = services.build_payload(serializer, campaign, compile_result)
+        payload = services.build_payload(serializer.data, campaign, compile_result)
         return Response(payload, status=status.HTTP_201_CREATED, headers=headers)
 
     @transaction.atomic
@@ -82,3 +82,11 @@ class CampaignViewSet(viewsets.ModelViewSet):
             {"detail": "Sending started.", "task_id": str(result["task_id"])},
             status=status.HTTP_202_ACCEPTED,
         )
+    
+    @action(detail=True, methods=["post"], url_path="test-email")
+    def send_test(self, request, pk: str | None = None):
+        serializer = self.get_serializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        to_email = serializer.validated_data.get("test_email")
+        result = services.send_test_email(campaign_id=pk, test_email=to_email)
+        return Response({"detail": "Test email sent.", **result}, status=status.HTTP_200_OK)

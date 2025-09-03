@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="{% static 'assets/css/easymde.min.css' %}">
 <script src="{% static 'assets/js/easymde.min.js' %}"></script>
 
-<div x-data="form" x-init="init()">
+<div x-data="form" >
     <ul class="flex space-x-2 rtl:space-x-reverse">
         <li>
             <a href="javascript:;" class="text-primary hover:underline">Forms</a>
@@ -19,7 +19,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Wizard Panel (kept same design) -->
             <div class="panel lg:col-span-2">
-                <div class="mb-5" x-data="{ activeTab: 1 }" x-effect="$store.wizard.activeTab = activeTab">
+                <div class="mb-5" x-effect="$store.wizard.activeTab = activeTab">
                     <div class="inline-block w-full">
                         <!-- Header / Steps (unchanged) -->
                         <div class="relative z-[1]">
@@ -213,6 +213,12 @@
                             <div class="flex justify-between pt-2">
                                 <button type="button" class="btn btn-primary" :disabled="$store.wizard.activeTab === 1" @click="$store.wizard.prev()">Back</button>
                                 <div class="flex items-center gap-2">
+                                    <button type="button" class="btn btn-secondary"
+                x-show="$store.wizard.activeTab === 3"
+                :disabled="submitting"
+                @click="openTestModal = true">
+            Send Test Email
+        </button>
                                     <button type="button" class="btn btn-primary" x-show="$store.wizard.activeTab < 3" @click="$store.wizard.next()">Next</button>
                                     <button type="submit" class="btn btn-primary" x-show="$store.wizard.activeTab === 3" :disabled="params.status === 'completed' || submitting || params.status === 'sending'">
                                         <span x-show="!submitting">Submit</span>
@@ -227,20 +233,45 @@
         </div>
 
     </div>
+<div class="fixed inset-0 bg-[black]/60 z-[999] hidden overflow-y-auto" :class="openTestModal && '!block'">
+                            <div class="flex items-center justify-center min-h-screen px-4" @click.self="openTestModal = false">
+                                <div x-show="openTestModal" x-transition x-transition.duration.300 class="panel border-0 p-0 rounded-lg overflow-hidden w-full max-w-lg my-8">
+                                    <div class="flex bg-[#fbfbfb] dark:bg-[#121c2c] items-center justify-between px-5 py-3">
+                                        <h5 class="font-bold text-lg">Modal Title</h5>
+                                    </div>
+                                    <div class="p-5">
+    <!-- Input -->
+    <div>
+        <label class="block text-sm font-medium mb-1">Test Email Address <span class="text-red-500">*</span></label>
+        <input type="email" class="form-input w-full"
+               x-model.trim="testEmail"
+               @input="testError=''"
+               placeholder="e.g. you@example.com" />
+        <p class="mt-1 text-xs text-danger" x-show="testError" x-text="testError"></p>
+        <p class="mt-1 text-xs text-slate-500">We’ll send a copy of this campaign to the email above.</p>
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="flex justify-end items-center mt-8">
+        <button type="button" class="btn btn-outline-danger" @click="openTestModal = false">Cancel</button>
+        <button type="button" class="btn btn-primary ltr:ml-4 rtl:mr-4"
+                :disabled="testSending || !testEmail"
+                @click="sendTestEmail">
+            <span >Send</span>
+        </button>
+    </div>
+</div>
+
+                                </div>
+                            </div>
+
 </div>
 
 <!-- Alpine store + logic (added only what is required) -->
 <script>
     document.addEventListener('alpine:init', () => {
         // shared store for step navigation
-        const easymde1 = new EasyMDE({
-        element: document.getElementById('mde-autosave'),
-        autosave: {
-            enabled: true,
-            delay: 1000,
-            uniqueId: 'mde-autosave-demo'
-        }
-        });
+        
         Alpine.store('wizard', {
             activeTab: 1,
             goTo(step) {
@@ -259,7 +290,8 @@
         });
 
         Alpine.data('form', () => ({
-            // --- state
+            // --- statusVal.toLowerCase
+            activeTab: 1,
             submitting: false,
             audiences: [],
             statusOptions: ['draft','scheduled','sending','completed'],
@@ -283,12 +315,22 @@
                 content_html: '',
             },
             errors: { title: '', subject: '', from_email: '', from_name: '', audience: '', scheduled_at: '', content_html: '' },
-
+            EasyMDE: null,
+            openTestModal: false,
+            testEmail: '',
             init() {
                 // link store validator to this component
                 Alpine.store('formCtl').validateStep = (s) => this.validateStep(s);
-                this.loadData();
+                this.loadData().then(() => {
+                    this.initEasyMDE();
+                });
                 this.loadAudiences();
+            },
+            initEasyMDE(){
+                this.EasyMDE = new EasyMDE({
+                    element: document.getElementById('mde-autosave'),
+                    
+                });
             },
             async loadData(){
                 let baseUrl = `${APP_URL}/campaigns/`;
@@ -302,6 +344,36 @@
                     console.log(this.params);
                 } catch (error) {
                     console.error(error);
+                }
+            },
+            async sendTestEmail(){
+                this.testError = '';
+                if (!this.testEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.testEmail)) {
+                    this.testError = 'Please enter a valid email address.';
+                    return;
+                }
+                this.testSending = true;
+                try {
+                    const payload = {
+                        email: this.testEmail,
+                    };
+                    console.log("Sending test email with payload:", payload);
+                    let response = await fetch(`${APP_URL}/campaigns/${this.params.id}/test-email/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie("csrftoken"),
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    let data = await response.json();
+                    console.log('Test email sent', data);
+                    this.openTestModal = false;
+                } catch (error) {
+                    console.error('Error sending test email:', error);
+                    this.testError = 'Failed to send test email. Please try again.';
+                } finally {
+                    this.testSending = false;
                 }
             },
 
