@@ -2,7 +2,7 @@ from django.db.models.functions import Lower
 from rest_framework import serializers
 from .models import Campaign, CampaignStatus, ScheduleType
 from audience.models import Contact
-from campaign.services import campaign_serializer_service
+from campaign.services import campaigns
 
 
 class CampaignSerializer(serializers.ModelSerializer):
@@ -29,7 +29,7 @@ class CampaignSerializer(serializers.ModelSerializer):
         validated_data["status"] = CampaignStatus.Draft
         validated_data.setdefault("schedule_type", ScheduleType.Immediate)
         campaign = super().create(validated_data)
-        campaign.estimated_recipients = campaign_serializer_service.estimate_recipients(campaign)
+        campaign.estimated_recipients = campaigns.estimate_recipients(campaign)
         campaign.save(update_fields=["estimated_recipients"])
         return campaign
 
@@ -39,6 +39,6 @@ class CampaignSerializer(serializers.ModelSerializer):
         old_excl = instance.exclude_unsubscribed
         campaign = super().update(instance, validated_data)
         if campaign.audience != old_audience or campaign.exclude_unsubscribed != old_excl:
-            campaign.estimated_recipients = campaign_serializer_service.estimate_recipients(campaign)
+            campaign.estimated_recipients = campaigns.estimate_recipients(campaign)
             campaign.save(update_fields=["estimated_recipients"])
         return campaign

@@ -166,14 +166,9 @@ class Campaign(models.Model):
     def mark_sending(self):
         self.status = CampaignStatus.Sending
         self.started_sending_at = timezone.now()
-        print("Marking sending")
         #self.provider_status = ProviderStatus.RUNNING
 
     def mark_sent(self):
-        print("Marking sent")
-        print("Current status:", self.status)
         self.status = CampaignStatus.Completed
         self.completed_at = timezone.now()
-        print("Marking completed")
-        print("Current status:", self.status)
         #self.provider_status = ProviderStatus.COMPLETED

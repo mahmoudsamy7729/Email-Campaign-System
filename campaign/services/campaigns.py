@@ -6,7 +6,6 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from campaign.models import Campaign, CampaignStatus
-from campaign.serializers import CampaignSerializer
 from campaign.tasks import kickoff_campaign_send
 from campaign.services import exceptions
 from tracking import link_compiler

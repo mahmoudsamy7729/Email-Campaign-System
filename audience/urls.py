@@ -1,5 +1,5 @@
 from rest_framework.routers import DefaultRouter
-from .api import ContactViewSet, TagViewSet, AudienceViewSet
+from .views import ContactViewSet, TagViewSet, AudienceViewSet
 
 app_name = "audience"
 
