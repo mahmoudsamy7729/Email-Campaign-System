@@ -182,7 +182,19 @@
     </form>
 
     <div class="mt-5 panel p-0 border-0 overflow-hidden">
-        <template x-if="displayType === 'list'">
+        <template x-if="isLoading">
+        <div class="flex items-center justify-center py-10">
+            <svg class="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none"
+                viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10"
+                    stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span class="ml-3 text-gray-600 dark:text-gray-300">Loading campaigns…</span>
+        </div>
+        </template>
+        <template x-if="!isLoading && displayType === 'list'">
             <div class="table-responsive">
                 <table class="table-striped table-hover whitespace-nowrap" >
                     <thead>
@@ -220,6 +232,12 @@
                       </tr>
                     </thead>
                     <tbody>
+                        <tr x-show="!isLoading && campaignList.length === 0">
+                        <td colspan="11" class="text-center text-lg py-6 text-danger dark:text-danger" style="text-align:center">
+                            No campaigns found
+                        </td>
+                        </tr>
+                        
                         <template x-for="campaign in campaignList" :key="campaign.id">
                           <tr>
                             <!-- Select -->
@@ -304,7 +322,18 @@
                 </table>
             </div>
         </template>
+        
     </div>
+    <div x-show="!isLoading && totalPages > 0" class="flex justify-center w-full mt-6">
+        <ul class="inline-flex items-center space-x-1 rtl:space-x-reverse">
+            <li><button type="button" :disabled="!prevPageUrl" @click="if (currentPage > 1) loadData(currentPage - 1)" class="flex justify-center font-semibold px-3.5 py-2 rounded transition bg-white-light text-dark hover:text-white hover:bg-primary dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary">Prev</button></li>
+            <template x-for="page in totalPages" :key="page">
+                <li><button type="button" @click="loadData(page)" :class="`flex justify-center font-semibold px-3.5 py-2 rounded transition ${currentPage === page ? 'bg-primary text-white dark:text-white-light dark:bg-primary' : 'bg-white-light text-dark hover:text-white hover:bg-primary dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary'}`" x-text="page"></button></li>
+            </template>
+            <li><button type="button" :disabled="!nextPageUrl" @click="if (currentPage < totalPages) loadData(currentPage + 1)"   class="flex justify-center font-semibold px-3.5 py-2 rounded transition bg-white-light text-dark hover:text-white hover:bg-primary dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary">Next</button></li>
+        </ul>
+    </div>
+    
 </div>
 
 
@@ -339,6 +368,13 @@
                 from_name: '',
                 from_email: ''
             },
+            isLoading: false,
+            count: 0,
+            currentPage: 1,
+            itemsPerPage: 8,
+            nextPageUrl: null,
+            prevPageUrl: null,
+            totalPages: 0,
             filterdContactsList: [],
             searchUser: '',
             campaignList: [],
@@ -513,17 +549,30 @@
                 this.filterdContactsList = this.contactList.filter((d) => d.name.toLowerCase()
                     .includes(this.searchUser.toLowerCase()));
             },
-            async loadData(){
+            sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            },
+            async loadData(page = null){
                 try {
+                    this.isLoading = true;
+                    //await this.sleep(2000); // Simulate loading delay
                     let baseUrl = `${APP_URL}/campaigns/`;
-                    let queryString = window.location.search;
-                    let url = baseUrl + queryString;
+                    let queryString = new URLSearchParams(window.location.search);
+                    if (page) {
+                        queryString.set('page', page);
+                    }
+                    this.currentPage = parseInt(queryString.get('page')) || 1;
+                    let url = baseUrl + '?' + queryString.toString();
                     let response = await fetch(url);
                     let data = await response.json();
-                    //console.log(data);
+                    this.count = data.count;
+                    this.nextPageUrl = data.next;
+                    this.prevPageUrl = data.previous;
+                    this.isLoading = false;
                     this.campaignList = data.results;
-                    //console.log(this.campaignList)
-                    //this.searchContacts();
+                    this.totalPages = Math.ceil(this.count / this.itemsPerPage);
+                    console.log(this.totalPages);
+                    window.history.pushState({}, '', `?${queryString.toString()}`);
                 } catch (error) {
                     console.error('Error loading data:', error);
                 }
