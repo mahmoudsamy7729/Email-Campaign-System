@@ -156,10 +156,9 @@
                                             </label>
                                         </div>
                                     </div>
-
                                     <div x-show="params.schedule_type === 'scheduled'">
                                         <label class="block text-sm font-medium mb-1">Send at</label>
-                                        <input type="datetime-local" class="form-input w-full" x-model="params.send_at" @blur="validateField('send_at')">
+                                        <input type="datetime-local" class="form-input w-full" x-model="params.scheduled_at" @blur="validateField('send_at')">
                                         <p class="mt-1 text-xs text-danger" x-text="errors.send_at" x-show="errors.send_at"></p>
                                     </div>
                                 </div>
@@ -212,7 +211,14 @@
                             <!-- Actions -->
                             <div class="flex justify-between pt-2">
                                 <button type="button" class="btn btn-primary" :disabled="$store.wizard.activeTab === 1" @click="$store.wizard.prev()">Back</button>
+                                
                                 <div class="flex items-center gap-2">
+                                    <button type="button" class="btn btn-success"
+                x-show="$store.wizard.activeTab === 3"
+                :disabled="submitting"
+                @click="saveAndExit">
+            Save & Exit
+        </button>
                                     <button type="button" class="btn btn-secondary"
                 x-show="$store.wizard.activeTab === 3"
                 :disabled="submitting"
@@ -221,8 +227,8 @@
         </button>
                                     <button type="button" class="btn btn-primary" x-show="$store.wizard.activeTab < 3" @click="$store.wizard.next()">Next</button>
                                     <button type="submit" class="btn btn-primary" x-show="$store.wizard.activeTab === 3" :disabled="params.status === 'completed' || submitting || params.status === 'sending'">
-                                        <span x-show="!submitting">Submit</span>
-                                        <span x-show="submitting">Submitting…</span>
+                                        <span x-show="!submitting">Send</span>
+                                        <span x-show="submitting">Sending…</span>
                                     </button>
                                 </div>
                             </div>
@@ -240,6 +246,8 @@
                                         <h5 class="font-bold text-lg">Modal Title</h5>
                                     </div>
                                     <div class="p-5">
+
+                                        
     <!-- Input -->
     <div>
         <label class="block text-sm font-medium mb-1">Test Email Address <span class="text-red-500">*</span></label>
@@ -255,9 +263,10 @@
     <div class="flex justify-end items-center mt-8">
         <button type="button" class="btn btn-outline-danger" @click="openTestModal = false">Cancel</button>
         <button type="button" class="btn btn-primary ltr:ml-4 rtl:mr-4"
-                :disabled="testSending || !testEmail"
+                :disabled="!testEmail || submittingTest"
                 @click="sendTestEmail">
-            <span >Send</span>
+            <span x-show="!submittingTest">Send</span>
+            <span x-show="submittingTest">Sending…</span>
         </button>
     </div>
 </div>
@@ -268,198 +277,7 @@
 </div>
 
 <!-- Alpine store + logic (added only what is required) -->
-<script>
-    document.addEventListener('alpine:init', () => {
-        // shared store for step navigation
-        
-        Alpine.store('wizard', {
-            activeTab: 1,
-            goTo(step) {
-                if (step < this.activeTab) { this.activeTab = step; return; }
-                // forward requires validation of current step
-                const ok = Alpine.store('formCtl').validateStep(this.activeTab);
-                if (ok) this.activeTab = step;
-            },
-            next() { this.goTo(this.activeTab + 1); },
-            prev() { this.activeTab = Math.max(1, this.activeTab - 1); },
-        });
+<script src="{% static 'assets/js/campaign-wizard.js' %}" defer></script>
 
-        // controller store (so header can trigger validation)
-        Alpine.store('formCtl', {
-            validateStep(step) { return true; },
-        });
-
-        Alpine.data('form', () => ({
-            // --- statusVal.toLowerCase
-            activeTab: 1,
-            submitting: false,
-            audiences: [],
-            statusOptions: ['draft','scheduled','sending','completed'],
-            kindOptions: ["regular","automated","rss"],
-            params: {
-                id: '{{ request.GET.id|default:"" }}',
-                title: '',
-                kind: '',
-                status: '',
-                subject_line: '', 
-                preview_text: '',
-                from_name: '',
-                from_email: '',
-                reply_to: '',
-                to_name_format: '',
-                audience: '',
-                estimated_recipients: 0,
-                exclude_unsubscribed: true,
-                schedule_type: '',
-                scheduled_at: '',
-                content_html: '',
-            },
-            errors: { title: '', subject: '', from_email: '', from_name: '', audience: '', scheduled_at: '', content_html: '' },
-            EasyMDE: null,
-            openTestModal: false,
-            testEmail: '',
-            init() {
-                // link store validator to this component
-                Alpine.store('formCtl').validateStep = (s) => this.validateStep(s);
-                this.loadData().then(() => {
-                    this.initEasyMDE();
-                });
-                this.loadAudiences();
-            },
-            initEasyMDE(){
-                this.EasyMDE = new EasyMDE({
-                    element: document.getElementById('mde-autosave'),
-                    
-                });
-            },
-            async loadData(){
-                let baseUrl = `${APP_URL}/campaigns/`;
-                let campaignId = this.params.id;
-                try {
-                    let response = await fetch(`${baseUrl}${campaignId}/`);
-                    if (!response.ok) throw new Error('Failed to load campaign data');
-                    let data = await response.json();
-                    this.params = { ...this.params, ...data };
-                    console.log('Loaded campaign data', data);
-                    console.log(this.params);
-                } catch (error) {
-                    console.error(error);
-                }
-            },
-            async sendTestEmail(){
-                this.testError = '';
-                if (!this.testEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.testEmail)) {
-                    this.testError = 'Please enter a valid email address.';
-                    return;
-                }
-                this.testSending = true;
-                try {
-                    const payload = {
-                        email: this.testEmail,
-                    };
-                    console.log("Sending test email with payload:", payload);
-                    let response = await fetch(`${APP_URL}/campaigns/${this.params.id}/test-email/`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCookie("csrftoken"),
-                        },
-                        body: JSON.stringify(payload)
-                    });
-                    let data = await response.json();
-                    console.log('Test email sent', data);
-                    this.openTestModal = false;
-                } catch (error) {
-                    console.error('Error sending test email:', error);
-                    this.testError = 'Failed to send test email. Please try again.';
-                } finally {
-                    this.testSending = false;
-                }
-            },
-
-            // --- helpers
-            validateField(key) {
-                const v = this.params[key];
-                this.errors[key] = '';
-                if (['title','subject_line','from_email','from_name','status','kind'].includes(key) && !v) this.errors[key] = 'Required';
-                if ((key === 'from_email' || key === 'reply_to') && v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) this.errors[key] = 'Invalid email';
-                if (key === 'audience' && !v) this.errors[key] = 'Please choose an audience';
-                if (key === 'send_at' && this.params.schedule_type === 'scheduled' && !v) this.errors[key] = 'Choose date & time';
-                if (key === 'content_html' && !v) this.errors[key] = 'Content is required';
-                return !this.errors[key];
-            },
-            validateStep(step) {
-                if (step === 1) {
-                    return ['title','subject','from_email','from_name','status','kind'].every(k => this.validateField(k));
-                }
-                if (step === 2) {
-                    const okA = this.validateField('audience');
-                    const okS = this.params.schedule_type === 'scheduled' ? this.validateField('send_at') : true;
-                    if (okA) this.estimateRecipients();
-                    return okA && okS;
-                }
-                if (step === 3) {
-                    return this.validateField('content_html');
-                }
-                return true;
-            },
-            audienceName(id) {
-                const a = this.audiences.find(x => String(x.id) === String(id));
-                return a ? a.name : '';
-            },
-
-            // --- data loaders
-            loadAudiences() {
-                if(this.audiences.length > 0){
-                    return;
-                }
-                fetch(`${APP_URL}/audiences/`)
-                .then(response => response.json())
-                .then(data => {
-                    this.audiences = data;
-                })
-                .catch(error => {
-                    console.error('Error fetching audiences:', error);
-                });
-            },
-            estimateRecipients() {
-                // Stub: in real app call backend to compute estimate
-                // e.g., GET /api/campaigns/estimate?audience=<id>&exclude_unsubscribed=<bool>
-                // Here we just show a static example number
-                this.estimatedRecipients = this.params.audience ? '~ 12,450' : '—';
-            },
-
-            // --- submit
-            async submitForm() {
-                this.params.content_html = document.getElementById('mde-autosave').value;
-                if (!this.validateStep(1) || !this.validateStep(2) || !this.validateStep(3)) {
-                    return;
-                }
-                this.submitting = true;
-                try {
-                    // Example payload
-                    const payload = { ...this.params };
-                    console.log("Submitting form with payload:");
-                    console.log(this.params);
-                    let response = await fetch(`${APP_URL}/campaigns/${this.params.id}/`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(payload)
-                    });
-                    let data = await response.json();
-                        console.log(data);
-
-                    }catch(e){
-                        console.error(e.message || "Unexpected error!");
-
-                    }finally{
-                        this.submitting = false
-                    }
-            },
-        }));
-    });
-</script>
 
 {% endblock %}

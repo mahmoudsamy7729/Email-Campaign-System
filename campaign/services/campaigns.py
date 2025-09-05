@@ -1,11 +1,10 @@
-from typing import Mapping, Any, Dict, TypedDict, Optional
+from typing import Mapping, Any, Dict, TypedDict, Optional, Type
 from django.conf import settings
 from django.db import transaction
 from django.core.mail import EmailMultiAlternatives
 from email.utils import formataddr
 
-from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.serializers import Serializer
 
 from campaign.models import Campaign, CampaignStatus
 from campaign.tasks import kickoff_campaign_send
@@ -100,7 +99,10 @@ def send_campaign(*, campaign_id: str | None) -> SendResult:
             campaign.mark_sending()
             campaign.save(update_fields=["status", "started_sending_at"])
 
-        task = kickoff_campaign_send.delay(str(campaign.id))
+        options = {}
+        if campaign.scheduled_at:
+            options["eta"] = campaign.scheduled_at
+        task = kickoff_campaign_send.apply_async(args=[str(campaign.id)], **options)
         return {"task_id": str(task.id)}
 
 def send_test_email(*, campaign_id: str | None, test_email: Optional[str]) -> dict :
@@ -119,3 +121,23 @@ def send_test_email(*, campaign_id: str | None, test_email: Optional[str]) -> di
     msg.attach_alternative(html_for_recipient, "text/html")
     msg.send(fail_silently=False)
     return {"sent_to": test_email}
+
+def update_campaign(pk: str | None , validated_data: Dict[str, Any], viewset_get_queryset, serializer_class: Type[Serializer]) -> None:
+    campaign = (
+            viewset_get_queryset()
+            .select_for_update(nowait=True)
+            .get(pk=pk)
+        )
+    old_html = campaign.content_html
+    compile_result: Dict = {}
+    serializer = serializer_class(campaign, data=validated_data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    campaign = serializer.save()
+    if should_compile(campaign, serializer.validated_data, True, old_html):
+        compile_result = compile_links(campaign)
+    rep = serializer.to_representation(campaign)  
+    print('Update Campaign',compile_result)
+    build_payload(rep, campaign, compile_result)  
+    return None
+    
+    

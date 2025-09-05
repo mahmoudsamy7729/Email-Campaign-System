@@ -1,3 +1,6 @@
+from django.conf import settings
+from django.utils import timezone
+
 from django.shortcuts import render
 
 # Create your views here.
@@ -31,6 +34,7 @@ def tables(request):
 
 
 def campaigns(request):
+    print("Current time (Django):", timezone.now())
     return render(request, 'apps/campaigns.html')
 
 def update_campaign(request):

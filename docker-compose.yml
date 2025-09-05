@@ -7,10 +7,14 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+    environment:
+      - TZ=Africa/Cairo
 
   redis:
     image: redis:latest
     container_name: redis
+    environment:
+      - TZ=Africa/Cairo
 
 
   celery:
@@ -22,6 +26,8 @@ services:
       - redis
     volumes:
       - .:/app  
+    environment:
+      - TZ=Africa/Cairo
 
   flower:
     build: .
@@ -34,3 +40,5 @@ services:
     depends_on:
       - redis
       - djangoserver
+    environment:
+      - TZ=Africa/Cairo

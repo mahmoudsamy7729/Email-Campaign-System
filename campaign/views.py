@@ -1,6 +1,6 @@
 from typing import Dict, Optional
 
-from django.db import transaction
+from django.db import transaction, DatabaseError
 from django.conf import settings
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -51,11 +51,12 @@ class CampaignViewSet(viewsets.ModelViewSet):
         old_html = instance.content_html
 
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        print("sent data",request.data)
         serializer.is_valid(raise_exception=True)
         campaign: Campaign = serializer.save()
 
         compile_result: Dict = {}
-        if services.should_compile(campaign, serializer.validated_data, force_recompile, old_html):
+        if services.should_compile(campaign, serializer.validated_data, True, old_html):
             compile_result = services.compile_links(campaign)
 
         rep = serializer.to_representation(campaign)        
@@ -70,14 +71,22 @@ class CampaignViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def send(self, request, pk: str | None = None) -> Response:
         try:
-            result = services.send_campaign(campaign_id=pk) 
+            services.update_campaign(pk, request.data, self.get_queryset, self.get_serializer)
+            result = services.send_campaign(campaign_id=pk)
         except Campaign.DoesNotExist:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         except exceptions.InvalidState as e:
             return Response({"detail": str(e)}, status=status.HTTP_409_CONFLICT)
         except exceptions.ZeroRecipients as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
+        except DatabaseError:
+            # someone else is editing/sending right now
+            return Response(
+                {"detail": "Campaign is currently being modified. Try again."},
+                status=status.HTTP_423_LOCKED,  # 423 Locked
+            )
+        except Exception as e:
+            print(e)
         return Response(
             {"detail": "Sending started.", "task_id": str(result["task_id"])},
             status=status.HTTP_202_ACCEPTED,

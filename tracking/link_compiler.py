@@ -18,11 +18,9 @@ def is_trackable_href(href: str) -> bool:
     if not href:
         return False
     href = href.strip()
-    print("href to check:", href)
     if href.startswith("#"):
         return False
     low = href.lower()
-    print("low:", low)
     # Track only http/https
     if not (low.startswith("http://") or low.startswith("https://")):
         return False
@@ -52,7 +50,6 @@ def compile_links_for_campaign(*, campaign, tracking_base: str) -> dict:
     """
     html = campaign.content_html or ""
     compiled_html = markdown.markdown(html) if html else None
-    print("Compiling links for campaign:", compiled_html)
     soup = BeautifulSoup(str(compiled_html), "html.parser")
     
     seen = {}  # normalized_url -> token

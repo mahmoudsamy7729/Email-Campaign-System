@@ -4,7 +4,6 @@
     x-data="{
       activeDropdown: null,
       current: window.location.pathname,
-      handleKeys(e){ if(e.shiftKey && (e.key==='N' || e.key==='n')) { window.location.href='/campaigns/new' } }
     }"
     @keydown.window="handleKeys"
     class="sidebar fixed min-h-screen h-full top-0 bottom-0 w-[260px] shadow-[5px_0_25px_0_rgba(94,92,154,0.1)] z-50 transition-all duration-300"
@@ -52,7 +51,6 @@
           </button>
           <ul x-cloak x-show="activeDropdown === 'campaigns' || current.startsWith('/campaigns')" x-collapse class="sub-menu text-gray-500">
             <li><a href="/campaigns">All</a></li>
-            <li><a href="/campaigns/new">New Campaign</a></li>
             <li><a href="/campaigns?status=scheduled">Scheduled</a></li>
             <li><a href="/campaigns?status=draft">Drafts</a></li>
             <li><a href="/campaigns?status=completed">Completed</a></li>

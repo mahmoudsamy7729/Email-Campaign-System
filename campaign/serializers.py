@@ -35,9 +35,12 @@ class CampaignSerializer(serializers.ModelSerializer):
         return campaign
 
     def update(self, instance, validated_data):
-        print(validated_data)
         old_audience = instance.audience
         old_excl = instance.exclude_unsubscribed
+        if "schedule_type" in validated_data and validated_data["schedule_type"] == ScheduleType.Immediate:
+            validated_data["scheduled_at"] = None
+        if validated_data["schedule_type"] == ScheduleType.Scheduled:
+            validated_data["status"] = CampaignStatus.Scheduled
         campaign = super().update(instance, validated_data)
         if campaign.audience != old_audience or campaign.exclude_unsubscribed != old_excl:
             campaign.estimated_recipients = campaigns.estimate_recipients(campaign)
