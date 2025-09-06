@@ -35,6 +35,8 @@ class CampaignSerializer(serializers.ModelSerializer):
         return campaign
 
     def update(self, instance, validated_data):
+        print("sent data test")
+
         old_audience = instance.audience
         old_excl = instance.exclude_unsubscribed
         if "schedule_type" in validated_data and validated_data["schedule_type"] == ScheduleType.Immediate:

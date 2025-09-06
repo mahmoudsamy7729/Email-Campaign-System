@@ -14,6 +14,8 @@ from campaign.models import Campaign
 from audience.models import Contact
 from django.db.models.functions import Lower
 from . import email_service
+from campaign.tasks import dispatch_next_chunk
+
 
 
 class SendResult(TypedDict):
@@ -82,7 +84,6 @@ def build_payload(rep: Dict[str, Any],
 
 def validate_send_or_raise(campaign: Campaign) -> None:
     if campaign.status not in {CampaignStatus.Draft, CampaignStatus.Scheduled}:
-        # 409 fits "invalid state transition"
         raise exceptions.InvalidState(f"Campaign already {campaign.status}.")
     if campaign.estimated_recipients == 0:
         raise exceptions.ZeroRecipients("Estimated recipients is 0.")
@@ -91,14 +92,8 @@ def validate_send_or_raise(campaign: Campaign) -> None:
 
 def send_campaign(*, campaign_id: str | None) -> SendResult:
         # Lock row to avoid double-send races under concurrent requests
-        with transaction.atomic():
-            campaign = Campaign.objects.select_for_update().get(pk=campaign_id)
-
-            validate_send_or_raise(campaign)
-
-            campaign.mark_sending()
-            campaign.save(update_fields=["status", "started_sending_at"])
-
+        campaign = Campaign.objects.select_for_update().get(pk=campaign_id)
+        validate_send_or_raise(campaign)
         options = {}
         if campaign.scheduled_at:
             options["eta"] = campaign.scheduled_at
@@ -140,4 +135,25 @@ def update_campaign(pk: str | None , validated_data: Dict[str, Any], viewset_get
     build_payload(rep, campaign, compile_result)  
     return None
     
+
+def pause_campaign(campaign_id: str | None) -> dict:
+    with transaction.atomic():
+        c = Campaign.objects.select_for_update().get(pk=campaign_id)
+        if c.status == CampaignStatus.Completed:
+            return {"detail": "Already completed"}
+        c.mark_paused()
+        c.save(update_fields=["status"])
+    return {"detail": "Paused"}
+
+
+def resume_campaign(campaign_id: str | None) -> dict:
+    with transaction.atomic():
+        c = Campaign.objects.select_for_update().get(pk=campaign_id)
+        if c.status == CampaignStatus.Completed:
+            return {"detail": "Already completed"}
+        c.mark_sending()
+        c.save(update_fields=["status", "started_sending_at"])
+    # kick dispatcher to continue
+    dispatch_next_chunk.delay(campaign_id)
+    return {"detail": "Resumed"}
     

@@ -276,7 +276,8 @@
                                   'bg-secondary': campaign.status === 'scheduled',
                                   'bg-primary': campaign.status === 'sending',
                                   'bg-success': campaign.status === 'completed',
-                                  'bg-danger': campaign.status === 'failed'
+                                  'bg-danger': campaign.status === 'failed',
+                                  'bg-warning': campaign.status === 'paused'
                                 }"
                                 x-text="campaign.status"
                               ></span>
@@ -310,7 +311,8 @@
                             <td class="!text-center">
                               <div class="flex items-center justify-center gap-2">
                                 <button x-show="campaign.status !== 'sending' && campaign.status !== 'completed'" type="button" class="btn btn-sm btn-outline-primary" @click="editCampaign(campaign)" >Edit</button>
-                                <button x-show="campaign.status === 'sending' " type="button" class="btn btn-sm btn-outline-primary" @click="editCampaign(campaign)" >Pause</button>
+                                <button x-show="campaign.status === 'sending' " type="button" class="btn btn-sm btn-outline-warning" @click="PauseCampaign(campaign)" >Pause</button>
+                                <button x-show="campaign.status === 'paused' " type="button" class="btn btn-sm btn-outline-info" @click="ResumeCampaign(campaign)" >Resume</button>
                                 <a :href="`campaigns/update/?id=${campaign.id}`" class="btn btn-sm btn-outline-secondary" >Preview</a>
                                 <button type="button" class="btn btn-sm btn-outline-danger" @click="#">Delete</button>
                               </div>
@@ -355,7 +357,7 @@
                 'audience': '{{ request.GET.audience|default:"" }}',
             },
             audiences: [],
-            statusOptions: ['draft','scheduled','sending','completed'],
+            statusOptions: ['draft','scheduled','sending','completed','paused'],
             kindOptions: ["regular","automated","rss"],
             selected: new Set(),
             displayType: 'list',
@@ -681,6 +683,46 @@
 
                 this.showMessage('Campaign has been saved successfully.');
                 this.addCampaignModal = false;
+            },
+            async PauseCampaign(campaign){
+                try{
+                        let response = await fetch(`${APP_URL}/campaigns/${campaign.id}/pause/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            "X-CSRFToken": getCookie("csrftoken"),
+                        },
+                    });
+                        let data = await response.json();
+                        this.loadData();
+                    }catch(e){
+                        console.error(e.message || "Unexpected error!");
+
+                    }finally{
+                        console.log('done');
+                       
+                    }
+
+            },
+            async ResumeCampaign(campaign){
+                try{
+                        let response = await fetch(`${APP_URL}/campaigns/${campaign.id}/resume/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            "X-CSRFToken": getCookie("csrftoken"),
+                        },
+                    });
+                        let data = await response.json();
+                        this.loadData();
+                    }catch(e){
+                        console.error(e.message || "Unexpected error!");
+
+                    }finally{
+                        console.log('done');
+                       
+                    }
+
             },
 
             deleteUser(user) {

@@ -251,10 +251,22 @@ TAILWIND_APP_NAME = 'vristoDjango'
 TAILWIND_CSS_PATH = 'assets/css/styles.css'
 
 
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://redis:6379/1",  # اختار db رقم 1
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
+
+
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1   # fair sharing
 CELERY_TASK_ACKS_LATE = True           # safer if a worker dies mid-task
 CELERY_BROKER_URL = "redis://redis:6379/0"
-CELERY_RESULT_BACKEND = "redis://redis:6379/1"  # optional if you want statuses
+CELERY_RESULT_BACKEND = "redis://redis:6379/2"  # optional if you want statuses
 CELERY_TIMEZONE = "Africa/Cairo"
 
 

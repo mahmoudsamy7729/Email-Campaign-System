@@ -1,4 +1,4 @@
-from django.core.mail import EmailMultiAlternatives, get_connection
+from django.core.mail import EmailMultiAlternatives
 from django.db.models.functions import Lower
 from django.db.models import F, QuerySet
 from django.utils import timezone

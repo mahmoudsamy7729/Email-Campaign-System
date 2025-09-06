@@ -65,22 +65,22 @@
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label class="block text-sm font-medium mb-1">Title <span class="text-red-500">*</span></label>
-                                        <input type="text" class="form-input w-full" x-model.trim="params.title" @blur="validateField('title')" placeholder="Campaign title"/>
+                                        <input type="text" class="form-input w-full" :disabled="params.status === 'completed' || submitting || params.status === 'sending'" x-model.trim="params.title" @blur="validateField('title')" placeholder="Campaign title"/>
                                         <p class="mt-1 text-xs text-danger" x-text="errors.title" x-show="errors.title"></p>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium mb-1">Subject <span class="text-red-500">*</span></label>
-                                        <input type="text" class="form-input w-full" x-model.trim="params.subject_line" @blur="validateField('subject_line')" placeholder="Email subject"/>
+                                        <input type="text" class="form-input w-full" :disabled="params.status === 'completed' || submitting || params.status === 'sending'" x-model.trim="params.subject_line" @blur="validateField('subject_line')" placeholder="Email subject"/>
                                         <p class="mt-1 text-xs text-danger" x-text="errors.subject_line" x-show="errors.subject_line"></p>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium mb-1">From Email <span class="text-red-500">*</span></label>
-                                        <input type="email" class="form-input w-full" x-model.trim="params.from_email" @blur="validateField('from_email')" placeholder="e.g. marketing@brand.com"/>
+                                        <input type="email" class="form-input w-full" :disabled="params.status === 'completed' || submitting || params.status === 'sending'" x-model.trim="params.from_email" @blur="validateField('from_email')" placeholder="e.g. marketing@brand.com"/>
                                         <p class="mt-1 text-xs text-danger" x-text="errors.from_email" x-show="errors.from_email"></p>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium mb-1">From Name <span class="text-red-500">*</span></label>
-                                        <input type="text" class="form-input w-full" x-model.trim="params.from_name" @blur="validateField('from_name')" placeholder="e.g. Brand Team"/>
+                                        <input type="text" class="form-input w-full" :disabled="params.status === 'completed' || submitting || params.status === 'sending'" x-model.trim="params.from_name" @blur="validateField('from_name')" placeholder="e.g. Brand Team"/>
                                         <p class="mt-1 text-xs text-danger" x-text="errors.from_name" x-show="errors.from_name"></p>
                                     </div>
                                     <div>
@@ -90,7 +90,7 @@
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium mb-1">To Name Format <span class="text-red-500"></span></label>
-                                        <input type="text" class="form-input w-full" x-model.trim="params.to_name_format" @blur="validateField('to_name_format')" placeholder="e.g. Brand Team"/>
+                                        <input type="text" class="form-input w-full" :disabled="params.status === 'completed' || submitting || params.status === 'sending'" x-model.trim="params.to_name_format" @blur="validateField('to_name_format')" placeholder="e.g. Brand Team"/>
                                         <p class="mt-1 text-xs text-danger" x-text="errors.to_name_format" x-show="errors.to_name_format"></p>
                                     </div>
                                     <div class="md:col-span-1">
@@ -108,7 +108,7 @@
                                     <div class="md:col-span-1">
                                         <label class="block text-sm font-medium mb-1">Kind <span class="text-red-500">*</span></label>
                                         <div class="relative">
-                                            <select class="form-input w-full appearance-none pr-10" x-model="params.kind" >
+                                            <select class="form-input w-full appearance-none pr-10" :disabled="params.status === 'completed' || submitting || params.status === 'sending'" x-model="params.kind" >
                                                 <option value="" disabled selected>Select a kind…</option>
                                                 <template x-for="k in kindOptions" :key="k">
                                                     <option :value="k" x-text="k" :selected="k === params.kind"></option>
@@ -126,7 +126,7 @@
                                     <div class="md:col-span-1">
                                         <label class="block text-sm font-medium mb-1">Audience <span class="text-red-500">*</span></label>
                                         <div class="relative">
-                                            <select class="form-input w-full appearance-none pr-10" x-model="params.audience" @change="validateField('audience')" @click.once="loadAudiences()">
+                                            <select class="form-input w-full appearance-none pr-10" :disabled="params.status === 'completed' || submitting || params.status === 'sending'" x-model="params.audience" @change="validateField('audience')" @click.once="loadAudiences()">
                                                 <option value="" disabled selected>Select an audience…</option>
                                                 <template x-for="a in audiences" :key="a.id">
                                                     <option :value="a.id" x-text="a.name" :selected="a.id === params.audience"></option>
@@ -138,7 +138,7 @@
                                     <div>
                                         <label class="block text-sm font-medium mb-1">Exclude unsubscribed</label>
                                         <label class="inline-flex items-center space-x-2">
-                                            <input type="checkbox" class="form-checkbox" x-model="params.exclude_unsubscribed">
+                                            <input type="checkbox" :disabled="params.status === 'completed' || submitting || params.status === 'sending'" class="form-checkbox" x-model="params.exclude_unsubscribed">
                                             <span class="text-sm">Only active subscribers</span>
                                         </label>
                                     </div>
@@ -147,11 +147,11 @@
                                         <label class="block text-sm font-medium mb-1">Schedule</label>
                                         <div class="flex items-center gap-4">
                                             <label class="inline-flex items-center space-x-2">
-                                                <input type="radio" class="form-radio" value="immediate" x-model="params.schedule_type">
+                                                <input type="radio" :disabled="params.status === 'completed' || submitting || params.status === 'sending'" class="form-radio" value="immediate" x-model="params.schedule_type">
                                                 <span class="text-sm">Send now</span>
                                             </label>
                                             <label class="inline-flex items-center space-x-2">
-                                                <input type="radio" class="form-radio" value="scheduled" x-model="params.schedule_type">
+                                                <input type="radio" :disabled="params.status === 'completed' || submitting || params.status === 'sending'" class="form-radio" value="scheduled" x-model="params.schedule_type">
                                                 <span class="text-sm">Schedule</span>
                                             </label>
                                         </div>
@@ -200,7 +200,7 @@
                                                 </div>
                                                 <div>
                                                     <div class="text-slate-500">Schedule</div>
-                                                    <div class="font-medium" x-text="params.schedule_type === 'scheduled' && params.send_at ? new Date(params.send_at).toLocaleString() : 'Send now'"></div>
+                                                    <div class="font-medium" x-text="params.schedule_type === 'scheduled' && params.scheduled_at ? new Date(params.scheduled_at).toLocaleString() : 'Send now'"></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -215,19 +215,22 @@
                                 <div class="flex items-center gap-2">
                                     <button type="button" class="btn btn-success"
                 x-show="$store.wizard.activeTab === 3"
+                :disabled="params.status === 'completed' || submitting || params.status === 'sending'"
                 :disabled="submitting"
                 @click="saveAndExit">
             Save & Exit
         </button>
                                     <button type="button" class="btn btn-secondary"
                 x-show="$store.wizard.activeTab === 3"
+                :disabled="params.status === 'completed' || submitting || params.status === 'sending'"
                 :disabled="submitting"
                 @click="openTestModal = true">
             Send Test Email
         </button>
                                     <button type="button" class="btn btn-primary" x-show="$store.wizard.activeTab < 3" @click="$store.wizard.next()">Next</button>
                                     <button type="submit" class="btn btn-primary" x-show="$store.wizard.activeTab === 3" :disabled="params.status === 'completed' || submitting || params.status === 'sending'">
-                                        <span x-show="!submitting">Send</span>
+                                        <span x-show="!submitting && params.schedule_type === 'immediate'">Send Now</span>
+                                        <span x-show="!submitting && params.schedule_type === 'scheduled'">Schedule & Send</span>
                                         <span x-show="submitting">Sending…</span>
                                     </button>
                                 </div>

@@ -13,6 +13,8 @@ from .serializers import CampaignSerializer
 from .tasks import kickoff_campaign_send
 from .services import campaigns as services
 from .services import exceptions
+from rest_framework import status as http
+
 
 
 
@@ -44,15 +46,14 @@ class CampaignViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
-        force_recompile = bool(request.data.get("force_recompile")) #True / False
 
         instance: Campaign = self.get_object()
         # Capture pre-save HTML to detect real change precisely
         old_html = instance.content_html
 
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        print("sent data",request.data)
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+
         campaign: Campaign = serializer.save()
 
         compile_result: Dict = {}
@@ -99,3 +100,19 @@ class CampaignViewSet(viewsets.ModelViewSet):
         to_email = serializer.validated_data.get("test_email")
         result = services.send_test_email(campaign_id=pk, test_email=to_email)
         return Response({"detail": "Test email sent.", **result}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=["post"])
+    def pause(self, request, pk=None):
+        try:
+            data = services.pause_campaign(pk)
+            return Response(data, status=http.HTTP_200_OK)
+        except Campaign.DoesNotExist:
+            return Response({"detail": "Not found."}, status=http.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, methods=["post"])
+    def resume(self, request, pk=None):
+        try:
+            data = services.resume_campaign(pk)
+            return Response(data, status=http.HTTP_200_OK)
+        except Campaign.DoesNotExist:
+            return Response({"detail": "Not found."}, status=http.HTTP_404_NOT_FOUND)

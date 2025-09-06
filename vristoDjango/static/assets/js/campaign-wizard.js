@@ -76,7 +76,9 @@
                     if (!response.ok) throw new Error('Failed to load campaign data');
                     let data = await response.json();
                     this.params = { ...this.params, ...data };
-                    this.params.scheduled_at = this.formatDateTimeForInput(data.scheduled_at);
+                    if(this.params.scheduled_at != null){
+                        this.params.scheduled_at = this.formatDateTimeForInput(data.scheduled_at);
+                    }
                 } catch (error) {
                     console.error(error);
                 }
@@ -86,6 +88,8 @@
                 try {
                     // Example payload
                     const payload = { ...this.params };
+
+                    console.log(payload)
                     let response = await fetch(`${APP_URL}/campaigns/${this.params.id}/`, {
                         method: 'PUT',
                         headers: {
@@ -93,6 +97,7 @@
                             'X-CSRFToken': getCookie("csrftoken"),
                         },
                         body: JSON.stringify(payload)
+                        
                     });
                     let data = await response.json();
                     }catch(e){

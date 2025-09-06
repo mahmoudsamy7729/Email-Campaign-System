@@ -16,6 +16,8 @@ class CampaignStatus(models.TextChoices):
     Completed = "completed", "Completed"
     Canceled = "canceled", "Canceled"
     Failed = "failed", "Failed"
+    Paused = "paused", "Paused"
+
 
 class ScheduleType(models.TextChoices):
     Immediate = "immediate", "Immediate"
@@ -172,3 +174,7 @@ class Campaign(models.Model):
         self.status = CampaignStatus.Completed
         self.completed_at = timezone.now()
         #self.provider_status = ProviderStatus.COMPLETED
+
+    def mark_paused(self):
+        self.status = CampaignStatus.Paused
+
