@@ -21,7 +21,7 @@
                                     <h3 class="text-lg font-medium bg-[#fbfbfb] dark:bg-[#121c2c] ltr:pl-5 rtl:pr-5 py-3 ltr:pr-[50px] rtl:pl-[50px]" x-text="params.id ? 'Edit Campaign' : 'New Campaign'"></h3>
                                     <div class="p-5 pt-3 pb-0">
                                         <!-- Campaign Form -->
-                                        <form @submit.prevent="saveUser" x-data="{ emailError:false }"
+                                        <form @submit.prevent="saveCampaign" x-data="{ emailError:false }"
                                             class="bg-white rounded-2xl shadow-xl ring-1 ring-black/5 p-6 sm:p-8 space-y-6 pt-0">
                                         <!-- Grid -->
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -194,7 +194,7 @@
             <span class="ml-3 text-gray-600 dark:text-gray-300">Loading campaigns…</span>
         </div>
         </template>
-        <template x-if="!isLoading && displayType === 'list'">
+        <template x-if="!isLoading">
             <div class="table-responsive">
                 <table class="table-striped table-hover whitespace-nowrap" >
                     <thead>
@@ -314,7 +314,7 @@
                                 <button x-show="campaign.status === 'sending' " type="button" class="btn btn-sm btn-outline-warning" @click="PauseCampaign(campaign)" >Pause</button>
                                 <button x-show="campaign.status === 'paused' " type="button" class="btn btn-sm btn-outline-info" @click="ResumeCampaign(campaign)" >Resume</button>
                                 <a :href="`campaigns/update/?id=${campaign.id}`" class="btn btn-sm btn-outline-secondary" >Preview</a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" @click="#">Delete</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @click="showAlert()">Delete</button>
                               </div>
                             </td>
                           </tr>
@@ -326,14 +326,44 @@
         </template>
         
     </div>
-    <div x-show="!isLoading && totalPages > 0" class="flex justify-center w-full mt-6">
-        <ul class="inline-flex items-center space-x-1 rtl:space-x-reverse">
-            <li><button type="button" :disabled="!prevPageUrl" @click="if (currentPage > 1) loadData(currentPage - 1)" class="flex justify-center font-semibold px-3.5 py-2 rounded transition bg-white-light text-dark hover:text-white hover:bg-primary dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary">Prev</button></li>
-            <template x-for="page in totalPages" :key="page">
-                <li><button type="button" @click="loadData(page)" :class="`flex justify-center font-semibold px-3.5 py-2 rounded transition ${currentPage === page ? 'bg-primary text-white dark:text-white-light dark:bg-primary' : 'bg-white-light text-dark hover:text-white hover:bg-primary dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary'}`" x-text="page"></button></li>
-            </template>
-            <li><button type="button" :disabled="!nextPageUrl" @click="if (currentPage < totalPages) loadData(currentPage + 1)"   class="flex justify-center font-semibold px-3.5 py-2 rounded transition bg-white-light text-dark hover:text-white hover:bg-primary dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary">Next</button></li>
-        </ul>
+<div x-show="!isLoading && totalPages > 0" class="flex justify-center w-full mt-6">
+            <ul class="inline-flex items-center space-x-1 rtl:space-x-reverse">
+              <!-- Prev -->
+              <li>
+                  <button type="button" :disabled="!prevPageUrl"
+                      @click="if (currentPage > 1) loadData(currentPage - 1)"
+                      class="flex justify-center font-semibold px-3.5 py-2 rounded transition
+                            bg-white-light text-dark hover:text-white hover:bg-primary
+                            dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary">
+                      Prev
+                  </button>
+              </li>
+
+              <!-- Pages -->
+              <template x-for="page in pageRange()" :key="page">
+                  <li>
+                      <button type="button" @click="loadData(page)"
+                          :class="`flex justify-center font-semibold px-3.5 py-2 rounded transition ${
+                              currentPage === page
+                              ? 'bg-primary text-white dark:text-white-light dark:bg-primary'
+                              : 'bg-white-light text-dark hover:text-white hover:bg-primary dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary'
+                          }`"
+                          x-text="page">
+                      </button>
+                  </li>
+              </template>
+
+              <!-- Next -->
+              <li>
+                  <button type="button" :disabled="!nextPageUrl"
+                      @click="if (currentPage < totalPages) loadData(currentPage + 1)"
+                      class="flex justify-center font-semibold px-3.5 py-2 rounded transition
+                            bg-white-light text-dark hover:text-white hover:bg-primary
+                            dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary">
+                      Next
+                  </button>
+              </li>
+          </ul>
     </div>
     
 </div>
@@ -360,7 +390,6 @@
             statusOptions: ['draft','scheduled','sending','completed','paused'],
             kindOptions: ["regular","automated","rss"],
             selected: new Set(),
-            displayType: 'list',
             addCampaignModal: false,
             params: {
                 id: null,
@@ -370,6 +399,8 @@
                 from_name: '',
                 from_email: ''
             },
+            campaignList: [],
+            //pagination
             isLoading: false,
             count: 0,
             currentPage: 1,
@@ -377,179 +408,44 @@
             nextPageUrl: null,
             prevPageUrl: null,
             totalPages: 0,
-            filterdContactsList: [],
-            searchUser: '',
-            campaignList: [],
-            contactList: [{
-                    id: 1,
-                    path: 'profile-35.png',
-                    name: 'Alan Green',
-                    role: 'Web Developer',
-                    email: 'alan@mail.com',
-                    location: 'Boston, USA',
-                    phone: '+1 202 555 0197',
-                    posts: 25,
-                    followers: '5K',
-                    following: 500,
-                },
-                {
-                    id: 2,
-                    path: 'profile-35.png',
-                    name: 'Linda Nelson',
-                    role: 'Web Designer',
-                    email: 'linda@mail.com',
-                    location: 'Sydney, Australia',
-                    phone: '+1 202 555 0170',
-                    posts: 25,
-                    followers: '21.5K',
-                    following: 350,
-                },
-                {
-                    id: 3,
-                    path: 'profile-35.png',
-                    name: 'Lila Perry',
-                    role: 'UX/UI Designer',
-                    email: 'lila@mail.com',
-                    location: 'Miami, USA',
-                    phone: '+1 202 555 0105',
-                    posts: 20,
-                    followers: '21.5K',
-                    following: 350,
-                },
-                {
-                    id: 4,
-                    path: 'profile-35.png',
-                    name: 'Andy King',
-                    role: 'Project Lead',
-                    email: 'andy@mail.com',
-                    location: 'Tokyo, Japan',
-                    phone: '+1 202 555 0194',
-                    posts: 25,
-                    followers: '21.5K',
-                    following: 300,
-                },
-                {
-                    id: 5,
-                    path: 'profile-35.png',
-                    name: 'Jesse Cory',
-                    role: 'Web Developer',
-                    email: 'jesse@mail.com',
-                    location: 'Edinburgh, UK',
-                    phone: '+1 202 555 0161',
-                    posts: 30,
-                    followers: '20K',
-                    following: 350,
-                },
-                {
-                    id: 6,
-                    path: 'profile-35.png',
-                    name: 'Xavier',
-                    role: 'UX/UI Designer',
-                    email: 'xavier@mail.com',
-                    location: 'New York, USA',
-                    phone: '+1 202 555 0155',
-                    posts: 25,
-                    followers: '21.5K',
-                    following: 350,
-                },
-                {
-                    id: 7,
-                    path: 'profile-35.png',
-                    name: 'Susan',
-                    role: 'Project Manager',
-                    email: 'susan@mail.com',
-                    location: 'Miami, USA',
-                    phone: '+1 202 555 0118',
-                    posts: 40,
-                    followers: '21.5K',
-                    following: 350,
-                },
-                {
-                    id: 8,
-                    path: 'profile-35.png',
-                    name: 'Raci Lopez',
-                    role: 'Web Developer',
-                    email: 'traci@mail.com',
-                    location: 'Edinburgh, UK',
-                    phone: '+1 202 555 0135',
-                    posts: 25,
-                    followers: '21.5K',
-                    following: 350,
-                },
-                {
-                    id: 9,
-                    path: 'profile-35.png',
-                    name: 'Steven Mendoza',
-                    role: 'HR',
-                    email: 'sokol@verizon.net',
-                    location: 'Monrovia, US',
-                    phone: '+1 202 555 0100',
-                    posts: 40,
-                    followers: '21.8K',
-                    following: 300,
-                },
-                {
-                    id: 10,
-                    path: 'profile-35.png',
-                    name: 'James Cantrell',
-                    role: 'Web Developer',
-                    email: 'sravani@comcast.net',
-                    location: 'Michigan, US',
-                    phone: '+1 202 555 0134',
-                    posts: 100,
-                    followers: '28K',
-                    following: 520,
-                },
-                {
-                    id: 11,
-                    path: 'profile-35.png',
-                    name: 'Reginald Brown',
-                    role: 'Web Designer',
-                    email: 'drhyde@gmail.com',
-                    location: 'Entrimo, Spain',
-                    phone: '+1 202 555 0153',
-                    posts: 35,
-                    followers: '25K',
-                    following: 500,
-                },
-                {
-                    id: 12,
-                    path: 'profile-35.png',
-                    name: 'Stacey Smith',
-                    role: 'Chief technology officer',
-                    email: 'maikelnai@optonline.net',
-                    location: 'Lublin, Poland',
-                    phone: '+1 202 555 0115',
-                    posts: 21,
-                    followers: '5K',
-                    following: 200,
-                },
-            ],
+            windowSize: 5,
+            pageRange() {
+            let start = this.currentPage - Math.floor(this.windowSize / 2);
+            let end = this.currentPage + Math.floor(this.windowSize / 2);
 
+            if (start < 1) {
+                start = 1;
+                end = this.windowSize;
+            }
+            if (end > this.totalPages) {
+                end = this.totalPages;
+                start = this.totalPages - this.windowSize + 1;
+                if (start < 1) start = 1;
+            }
+
+            let pages = [];
+            for (let i = start; i <= end; i++) {
+                pages.push(i);
+            }
+            return pages;
+        },
+            
             init() {
-                this.searchContacts();
                 this.loadData();
                 this.loadAudiences();
             },
-
-            loadAudiences(){
-                
+            loadAudiences(){                
                 if(this.audiences.length > 0){
                     return;
                 }
                 fetch(`${APP_URL}/audiences/`)
                 .then(response => response.json())
                 .then(data => {
-                    this.audiences = data;
+                    this.audiences = data.results;
                 })
                 .catch(error => {
-                    console.error('Error fetching audiences:', error);
+                    this.showMessage('Error, Unexpected error happened', 'error')
                 });
-            },
-
-            searchContacts() {
-                this.filterdContactsList = this.contactList.filter((d) => d.name.toLowerCase()
-                    .includes(this.searchUser.toLowerCase()));
             },
             sleep(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
@@ -573,13 +469,11 @@
                     this.isLoading = false;
                     this.campaignList = data.results;
                     this.totalPages = Math.ceil(this.count / this.itemsPerPage);
-                    console.log(this.totalPages);
                     window.history.pushState({}, '', `?${queryString.toString()}`);
                 } catch (error) {
-                    console.error('Error loading data:', error);
+                    this.showMessage('Error, Unexpected error happened', 'error')
                 }
             },
-
             editCampaign(campaign) {
                 if(this.audiences.length === 0){
                     this.loadAudiences();
@@ -589,11 +483,9 @@
                     this.params = JSON.parse(JSON.stringify(campaign));
                     console.log(this.params);
                 }
-
                 this.addCampaignModal = true;
             },
-
-            async saveUser() {
+            async saveCampaign() {
                 if (!this.params.title) {
                     this.showMessage('Title is required.', 'error');
                     return true;
@@ -614,9 +506,8 @@
                     this.showMessage('Audience is required.', 'error');
                     return true;
                 }
-
                 if (this.params.id) {
-                    //update user
+                    //update campaign
                     let campaign = this.campaignList.find((d) => d.id === this.params.id);
                     campaign.title = this.params.title;
                     campaign.from_email = this.params.from_email;
@@ -633,16 +524,12 @@
                         body: JSON.stringify(this.params)
                     });
                         let data = await response.json();
-                        console.log(data);
-
-                    }catch(e){
-                        console.error(e.message || "Unexpected error!");
-
-                    }finally{
                         this.loadData();
+                    }catch(e){
+                        this.showMessage('Error , Unexpected error happened', 'error')
                     }
                 } else {
-                    //add user
+                    //add Campaign
                     try{
                         let response = await fetch(`${APP_URL}/campaigns/`, {
                         method: 'POST',
@@ -653,36 +540,15 @@
                         body: JSON.stringify(this.params)
                     });
                         let data = await response.json();
-                        console.log(data);
                         if (data?.id) {
                             window.location.href = `/campaigns/update/?id=${data.id}`;
                         }
-
                     }catch(e){
-                        console.error(e.message || "Unexpected error!");
-
+                        this.showMessage('Error , Unexpected error happened', 'error')
                     }finally{
-                        console.log('done');
-                       
-                    }
-                    let maxUserId = this.contactList.length ? this.contactList.reduce((max,
-                            character) => (character.id > max ? character.id : max), this
-                        .contactList[0].id) : 0;
-
-                    let campaign = {
-                        id: 50,
-                        title: this.params.title,
-                        from_email: this.params.from_email,
-                        from_name: this.params.from_name,
-                        subject_line: this.params.subject_line,
-                        audience: this.params.audience,
-                    };
-                    this.campaignList.splice(0, 0, campaign);
-                    this.loadData();
+                        this.addCampaignModal = false;  
+                    }                    
                 }
-
-                this.showMessage('Campaign has been saved successfully.');
-                this.addCampaignModal = false;
             },
             async PauseCampaign(campaign){
                 try{
@@ -694,15 +560,11 @@
                         },
                     });
                         let data = await response.json();
+                        this.showMessage('Campaign has stopped successfully.');
                         this.loadData();
                     }catch(e){
-                        console.error(e.message || "Unexpected error!");
-
-                    }finally{
-                        console.log('done');
-                       
+                        this.showMessage('Error , Unexpected error happened', 'error')
                     }
-
             },
             async ResumeCampaign(campaign){
                 try{
@@ -716,27 +578,20 @@
                         let data = await response.json();
                         this.loadData();
                     }catch(e){
-                        console.error(e.message || "Unexpected error!");
-
-                    }finally{
-                        console.log('done');
-                       
+                        this.showMessage('Error , Unexpected error happened', 'error')
                     }
-
             },
-
-            deleteUser(user) {
-                this.contactList = this.contactList.filter((d) => d.id != user.id);
-                this.searchContacts();
+            deleteCampaign(campaign) {
+                this.campaignList = this.campaignList.filter((d) => d.id != user.id);
                 this.showMessage('User has been deleted successfully.');
             },
-            
             showMessage(msg = '', type = 'success') {
                 const toast = window.Swal.mixin({
                     toast: true,
                     position: 'top',
                     showConfirmButton: false,
                     timer: 3000,
+                    
                 });
                 toast.fire({
                     icon: type,

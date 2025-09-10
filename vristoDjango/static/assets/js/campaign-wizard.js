@@ -23,7 +23,7 @@
             activeTab: 1,
             submitting: false,
             audiences: [],
-            statusOptions: ['draft','scheduled','sending','completed'],
+            statusOptions: ['draft','scheduled','sending','completed','paused'],
             kindOptions: ["regular","automated","rss"],
             params: {
                 id: (new URLSearchParams(location.search)).get('id') || '',
@@ -49,11 +49,6 @@
             testEmail: '',
             testError: '',
             submittingTest: false,
-            formatDateTimeForInput(dateString) {
-                if (!dateString) return '';
-                let d = new Date(dateString);
-                return d.toISOString().slice(0,16); // "YYYY-MM-DDTHH:MM"
-            },
             init() {
                 // link store validator to this component
                 Alpine.store('formCtl').validateStep = (s) => this.validateStep(s);
@@ -65,7 +60,6 @@
             initEasyMDE(){
                 this.EasyMDE = new EasyMDE({
                     element: document.getElementById('mde-autosave'),
-                    
                 });
             },
             async loadData(){
@@ -80,7 +74,7 @@
                         this.params.scheduled_at = this.formatDateTimeForInput(data.scheduled_at);
                     }
                 } catch (error) {
-                    console.error(error);
+                    this.showMessage("Error, Unexpected error happend",'error');
                 }
             },
             async saveAndExit(){
@@ -97,12 +91,10 @@
                             'X-CSRFToken': getCookie("csrftoken"),
                         },
                         body: JSON.stringify(payload)
-                        
                     });
-                    let data = await response.json();
+                        let data = await response.json();
                     }catch(e){
-                        console.error(e.message || "Unexpected error!");
-
+                        this.showMessage("Error, Unexpected error happend",'error');
                     }finally{
                         window.location.href = '/campaigns';
                     }
@@ -123,7 +115,6 @@
                         email: this.testEmail,
                     };
                     this.submittingTest = true;
-
                     await fetch(`${APP_URL}/campaigns/${this.params.id}/test-email/`, {
                         method: 'POST',
                         headers: {
@@ -133,15 +124,17 @@
                         body: JSON.stringify(payload)
                     });
                     this.openTestModal = false;
-
                 } catch (error) {
-                    console.error('Error sending test email:', error);
-                } finally {
-                    this.openTestModal = false;
-                }
+                    this.submittingTest = false;
+                    this.showMessage("Error, Unexpected error happened");
+                } 
             },
-
             // --- helpers
+            formatDateTimeForInput(dateString) {
+                if (!dateString) return '';
+                let d = new Date(dateString);
+                return d.toISOString().slice(0,16); // "YYYY-MM-DDTHH:MM"
+            },
             validateField(key) {
                 const v = this.params[key];
                 this.errors[key] = '';
@@ -171,8 +164,6 @@
                 const a = this.audiences.find(x => String(x.id) === String(id));
                 return a ? a.name : '';
             },
-
-            // --- data loaders
             loadAudiences() {
                 if(this.audiences.length > 0){
                     return;
@@ -183,7 +174,7 @@
                     this.audiences = data;
                 })
                 .catch(error => {
-                    console.error('Error fetching audiences:', error);
+                    this.showMessage("Error, Unexpected error happened", error);
                 });
             },
             estimateRecipients() {
@@ -192,7 +183,6 @@
                 // Here we just show a static example number
                 this.estimatedRecipients = this.params.audience ? '~ 12,450' : '—';
             },
-
             // --- submit
             async submitForm() {
                 this.params.content_html = this.EasyMDE.value();
@@ -211,14 +201,25 @@
                         },
                         body: JSON.stringify(payload)
                     });
-                    let data = await response.json();
-                    }catch(e){
-                        console.error(e.message || "Unexpected error!");
-
-                    }finally{
                         this.submitting = false
                         this.params.status = 'sending';
+                        this.showMessage("Campaign Started Sending Emails");
+                    }catch(e){
+                        this.showMessage("Error, Unexpected error happened");
                     }
+            },
+            showMessage(msg = '', type = 'success') {
+                const toast = window.Swal.mixin({
+                    toast: true,
+                    position: 'top',
+                    showConfirmButton: false,
+                    timer: 3000,
+                });
+                toast.fire({
+                    icon: type,
+                    title: msg,
+                    padding: '10px 20px',
+                });
             },
         }));
     });

@@ -1,924 +1,745 @@
-{% extends 'components/layouts/default.html' %} {% load static %}
+{% extends 'components/layouts/default.html' %}
+{% load static %}
+
 {% block content %}
+<style>
+  
+  .table-responsive.table-sticky tbody tr:nth-child(odd) {
+  --row-bg: #f9fafb;
+  background-color: var(--row-bg);
+}
+.table-responsive.table-sticky tbody tr:nth-child(even) {
+  --row-bg: #fff;
+  background-color: var(--row-bg);
+}
 
-<div x-data="contacts()" class="space-y-6">
-  <!-- Header -->
-  <div class="flex items-start justify-between flex-wrap gap-4">
-    <div>
-      <h2 class="text-2xl font-semibold">Audience</h2>
-      <p class="text-white-dark text-sm">
-        Manage, filter, and segment your contacts.
-      </p>
+.table-responsive.table-sticky th {
+  background-color: #f6f8fa;
+}
+.table-sticky .sticky-col-1,
+.table-sticky .sticky-col-2 {
+  position: sticky;
+  z-index: 3; /* keep them above others */
+}
+
+.table-sticky .sticky-col-1,
+.table-sticky .sticky-col-2 {
+  background: var(--row-bg, #fff);
+}
+
+/* Checkbox column is first */
+.table-sticky .sticky-col-1 {
+  left: 0;
+}
+
+/* Email column comes right after checkbox */
+.table-sticky .sticky-col-2 {
+  left: 40px; /* adjust width to match your checkbox column */
+}
+
+/* Shadow on the Email column to show content sliding under */
+.table-sticky .sticky-col-2::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -10px;
+  width: 10px;
+  height: 100%;
+  /* keep your soft edge — swap to gradient if you prefer */
+  box-shadow: inset 12px 0 12px calc(calc(-1 * 12px)) #E2E9ED;
+  pointer-events: none;
+  opacity: 0;                 /* hidden until scrolled */
+  transition: opacity .2s ease;
+}
+.table-sticky.is-scrolled-x .sticky-col-2::after {
+  opacity: 1;
+}
+.select2-container--open .select2-dropdown {
+  top: 100% !important;
+  bottom: auto !important;
+}
+
+</style>
+
+
+<div x-data="contacts()">
+    <div class="flex items-center justify-between flex-wrap gap-4">
+        <h2 class="text-xl">contacts</h2>
     </div>
-    <div class="flex gap-2">
-      <a href="#" class="btn btn-outline-primary">Import</a>
-      <a href="#" class="btn btn-outline-primary">Export</a>
-      <button type="button" class="btn btn-primary" @click="openAdd()">
-        <svg
-          width="20"
-          height="20"
-          class="inline-block ltr:mr-2 rtl:ml-2"
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <path
-            d="M12 5v14M5 12h14"
-            stroke="currentColor"
-            stroke-width="1.7"
-            stroke-linecap="round"
-          />
-        </svg>
-        Add contact
-      </button>
-    </div>
-  </div>
-
-  <!-- Controls (Search + Filters + Bulk actions) -->
-  <div class="flex flex-wrap items-center gap-3">
-    <!-- Search -->
-    <div class="relative">
-      <input
-        type="text"
-        placeholder="Search name or email"
-        class="form-input py-2 ltr:pr-10 rtl:pl-10 w-72"
-        x-model="q"
-        @input.debounce.300ms="applyFilters"
-      />
-      <div
-        class="absolute ltr:right-[11px] rtl:left-[11px] top-1/2 -translate-y-1/2 peer-focus:text-primary"
-      >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          class="w-4 h-4"
-        >
-          <circle
-            cx="11.5"
-            cy="11.5"
-            r="9.5"
-            stroke="currentColor"
-            stroke-width="1.5"
-            opacity="0.5"
-          ></circle>
-          <path
-            d="M18.5 18.5L22 22"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-          ></path>
-        </svg>
-      </div>
-    </div>
-
-    <!-- Status -->
-    <select
-      class="form-input py-2 w-48"
-      x-model="filters.status"
-      @change="applyFilters"
-    >
-      <option value="">All statuses</option>
-      <option value="subscribed">Subscribed</option>
-      <option value="unsubscribed">Unsubscribed</option>
-      <option value="cleaned">Cleaned</option>
-      <option value="non-subscribed">Non-subscribed</option>
-    </select>
-
-    <!-- Segment -->
-    <select
-      class="form-input py-2 w-56"
-      x-model="filters.segment"
-      @change="applyFilters"
-    >
-      <option value="">All contacts</option>
-      <option value="recent">Active last 30 days</option>
-      <option value="cold">No opens 90 days</option>
-      <option value="new">New this week</option>
-    </select>
-
-    <!-- Tag filter -->
-    <div class="flex items-center gap-2">
-      <select class="form-input py-2 w-80" x-model="tagToToggle">
-        <option value="">Filter by tag…</option>
-        <template x-for="t in allTags" :key="t">
-          <option :value="t" x-text="t"></option>
-        </template>
-      </select>
-      <button class="btn btn-outline-primary" @click="toggleTagFilter()">
-        Apply
-      </button>
-    </div>
-
-    <!-- Reset -->
-    <button
-      class="btn btn-outline-danger ltr:ml-auto rtl:mr-auto"
-      @click="clearFilters"
-    >
-      Reset
-    </button>
-
-    <!-- Bulk actions -->
-    <div class="relative" x-data="{open:false}">
-      <button
-        class="btn btn-outline-primary"
-        :class="{'opacity-50 pointer-events-none': selected.size===0}"
-        @click="open=!open"
-      >
-        Bulk actions
-      </button>
-      <div
-        x-show="open"
-        @click.outside="open=false"
-        class="absolute z-10 mt-2 w-48 panel p-2"
-      >
-        <button
-          class="w-full text-left px-3 py-2 rounded hover:bg-gray-50 dark:hover:bg-[#111827]"
-          @click="bulk('tag'); open=false"
-        >
-          Add tag…
-        </button>
-        <button
-          class="w-full text-left px-3 py-2 rounded hover:bg-gray-50 dark:hover:bg-[#111827]"
-          @click="bulk('unsubscribe'); open=false"
-        >
-          Unsubscribe
-        </button>
-        <button
-          class="w-full text-left px-3 py-2 rounded text-danger hover:bg-gray-50 dark:hover:bg-[#111827]"
-          @click="bulk('delete'); open=false"
-        >
-          Delete
-        </button>
-      </div>
-    </div>
-    <div class="text-sm text-white-dark" x-show="selected.size">
-      Selected: <span x-text="selected.size"></span>
-    </div>
-  </div>
-
-  <!-- Active tag chips -->
-  <div class="flex flex-wrap gap-2" x-show="filters.tags.length">
-    <template x-for="t in filters.tags" :key="t">
-      <span
-        class="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-[#111827] px-3 py-1 text-xs"
-      >
-        <span x-text="t"></span>
-        <button
-          class="text-white-dark hover:text-primary"
-          @click="removeTagFilter(t)"
-        >
-          ✕
-        </button>
-      </span>
-    </template>
-  </div>
-
-  <!-- Table -->
-  <div class="panel p-0 border-0 overflow-hidden">
-    <div class="table-responsive">
-      <table class="table-striped table-hover">
-        <thead>
-          <tr>
-            <th class="!w-10">
-              <input
-                type="checkbox"
-                @change="toggleAll($event)"
-                :checked="allOnPageSelected"
-              />
-            </th>
-            <th @click="sortBy('name')" class="cursor-pointer">Name</th>
-            <th @click="sortBy('email')" class="cursor-pointer">Email</th>
-            <th>Status</th>
-            <th>Tags</th>
-            <th>Source</th>
-            <th
-              @click="sortBy('signup_at')"
-              class="cursor-pointer whitespace-nowrap"
-            >
-              Signup date
-            </th>
-            <th
-              @click="sortBy('last_activity_at')"
-              class="cursor-pointer whitespace-nowrap"
-            >
-              Last activity
-            </th>
-            <th class="!text-center">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <template x-for="c in pageItems" :key="c.id">
-            <tr>
-              <td>
-                <input
-                  type="checkbox"
-                  :value="c.id"
-                  @change="toggleOne(c.id, $event)"
-                  :checked="selected.has(c.id)"
-                />
-              </td>
-              <td>
-                <div class="flex items-center w-max">
-                  <template x-if="c.path">
-                    <img
-                      :src="`{% static 'assets/images' %}/${c.path}`"
-                      class="h-8 w-8 rounded-full object-cover ltr:mr-2 rtl:ml-2"
-                      alt="avatar"
-                    />
-                  </template>
-                  <template x-if="!c.path">
-                    <div
-                      class="grid place-content-center h-8 w-8 ltr:mr-2 rtl:ml-2 rounded-full bg-primary text-white text-sm font-semibold"
-                    >
-                      <span
-                        x-text="(c.name||'').slice(0,1) + ((c.name||' ').split(' ')[1]||'').slice(0,1)"
-                      ></span>
-                    </div>
-                  </template>
-                  <div class="font-medium" x-text="c.name || '—'"></div>
-                </div>
-              </td>
-              <td>
-                <a
-                  :href="`mailto:${c.email}`"
-                  class="text-primary hover:underline"
-                  x-text="c.email"
-                ></a>
-              </td>
-              <td>
-                <span
-                  :class="statusClass(c.status)"
-                  class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                  x-text="cap(c.status)"
-                ></span>
-              </td>
-              <td>
-                <div class="flex flex-wrap gap-1">
-                  <template x-for="t in c.tags" :key="t">
-                    <span
-                      class="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#111827] text-xs"
-                      x-text="t"
-                    ></span>
-                  </template>
-                </div>
-              </td>
-              <td x-text="c.source || 'Import'"></td>
-              <td x-text="fmtDate(c.signup_at)"></td>
-              <td x-text="fmtDate(c.last_activity_at)"></td>
-              <td class="!text-center">
-                <div class="flex gap-2 justify-center">
-                  <a
-                    :href="`/contacts/${c.id}`"
-                    class="btn btn-sm btn-outline-primary"
-                    >View</a
-                  >
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary"
-                    @click="openEdit(c)"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-danger"
-                    @click="remove(c)"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </template>
-          <tr x-show="!pageItems.length">
-            <td colspan="9" class="text-center py-10 text-white-dark">
-              No contacts match your filters.
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Pagination -->
-    <div class="flex items-center justify-between px-4 py-3 border-t">
-      <div class="text-sm text-white-dark">
-        Showing <span x-text="fromRow"></span>–<span x-text="toRow"></span> of
-        <span x-text="filtered.length"></span>
-      </div>
-      <div class="flex items-center gap-2">
-        <button
-          class="btn btn-outline-primary"
-          :disabled="page===1"
-          @click="page--"
-        >
-          Prev
-        </button>
-        <div class="text-sm">
-          Page <span x-text="page"></span> / <span x-text="totalPages"></span>
-        </div>
-        <button
-          class="btn btn-outline-primary"
-          :disabled="page===totalPages"
-          @click="page++"
-        >
-          Next
-        </button>
-        <select
-          class="form-input py-1 w-24"
-          x-model.number="perPage"
-          @change="page=1"
-        >
-          <option :value="10">10</option>
-          <option :value="25">25</option>
-          <option :value="50">50</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <!-- Add/Edit Modal -->
-  <div
-    class="fixed inset-0 bg-[black]/60 z-[999] overflow-y-auto"
-    x-show="modal"
-    x-transition
-    x-cloak
-  >
-    <div
-      class="flex items-center justify-center min-h-screen px-4"
-      @click.self="closeModal()"
-    >
-      <div
-        class="panel border-0 p-0 rounded-lg overflow-hidden md:w-full max-w-lg w-[90%] my-8"
-      >
-        <button
-          type="button"
-          class="absolute top-4 ltr:right-4 rtl:left-4 text-white-dark hover:text-dark"
-          @click="closeModal()"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24px"
-            height="24px"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-          >
+<template x-teleport="body">
+  <div id="contactModal" class="fixed inset-0 bg-black/60 z-[999] overflow-y-auto hidden" :class="addcontactModal && '!block'">
+    <div class="flex items-center justify-center min-h-screen px-4" @click.self="addcontactModal = false">
+      <div x-show="addcontactModal" x-transition x-transition.duration.300 class="panel border-0 p-0 rounded-2xl overflow-hidden md:w-full max-w-2xl w-[92%] my-8">
+        <button type="button" class="absolute top-4 ltr:right-4 rtl:left-4 text-white-dark hover:text-dark" @click="addcontactModal = false">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
-        <h3
-          class="text-lg font-medium bg-[#fbfbfb] dark:bg-[#121c2c] ltr:pl-5 rtl:pr-5 py-3 ltr:pr-[50px] rtl:pl-[50px]"
-          x-text="form.id ? 'Edit Contact' : 'Add Contact'"
-        ></h3>
-        <div class="p-5">
-          <form @submit.prevent="save()">
-            <div class="grid grid-cols-1 gap-4">
-              <div>
-                <label>Name</label>
-                <input
-                  type="text"
-                  class="form-input"
-                  placeholder="Full name"
-                  x-model="form.name"
-                />
-              </div>
-              <div>
-                <label>Email</label>
-                <input
-                  type="email"
-                  class="form-input"
-                  placeholder="email@example.com"
-                  x-model="form.email"
-                />
-              </div>
-              <div class="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label>Phone</label>
-                  <input
-                    type="text"
-                    class="form-input"
-                    placeholder="+1 202 555…"
-                    x-model="form.phone"
-                  />
+
+        <h3 class="text-lg font-semibold bg-[#fbfbfb] dark:bg-[#121c2c] ltr:pl-6 rtl:pr-6 py-3 ltr:pr-[56px] rtl:pl-[56px]"
+            x-text="params.id ? 'Edit contact' : 'New contact'"></h3>
+
+        <div class="p-6 pt-2">
+          <!-- Contact Form -->
+          <form @submit.prevent="saveContact" class="bg-white rounded-2xl shadow-xl ring-1 ring-black/5 p-6 sm:p-8 space-y-6">
+
+            <!-- Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Email Address -->
+              <div >
+                <label for="email_address" class="block text-sm font-medium mb-1">Email Address <span class="text-red-500">*</span></label>
+                <div class="relative">
+                  <input id="email_address" type="email" placeholder="user@example.com"
+                         class="form-input w-full pr-10"
+                         x-model.trim="params.email_address" />
+                  <div class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-60">
+                  </div>
                 </div>
-                <div>
-                  <label>Status</label>
-                  <select class="form-input" x-model="form.status">
-                    <option value="subscribed">Subscribed</option>
-                    <option value="unsubscribed">Unsubscribed</option>
-                    <option value="cleaned">Cleaned</option>
-                    <option value="non-subscribed">Non-subscribed</option>
+                <p class="text-xs text-gray-500 mt-1">We’ll use this to send campaigns and updates.</p>
+              </div>
+
+              <!-- First Name -->
+              <div>
+                <label for="FNAME" class="block text-sm font-medium mb-1">First Name</label>
+                <input id="FNAME" type="text" class="form-input w-full" placeholder="e.g., Amr"
+                       x-model.trim="params.merge_fields.FNAME" />
+              </div>
+
+              <!-- Last Name -->
+              <div>
+                <label for="lname" class="block text-sm font-medium mb-1">Last Name</label>
+                <input id="lname" type="text" class="form-input w-full" placeholder="e.g., Samy"
+                       x-model.trim="params.merge_fields.LNAME" />
+              </div>
+
+              <!-- Phone -->
+              <div>
+                <label for="phone" class="block text-sm font-medium mb-1">Phone</label>
+                <input id="phone" type="tel" class="form-input w-full" placeholder="+20 10 0000 0000"
+                       x-model.trim="params.merge_fields.PHONE" />
+              </div>
+
+              <!-- Company -->
+              <div>
+                <label for="company" class="block text-sm font-medium mb-1">Company</label>
+                <input id="company" type="text" class="form-input w-full" placeholder="e.g., Alyusr"
+                       x-model.trim="params.merge_fields.COMPANY" />
+              </div>
+
+              <!-- Country -->
+              <div>
+                <label for="country" class="block text-sm font-medium mb-1">Country</label>
+                <input id="country" type="text" class="form-input w-full" placeholder="e.g., Egypt"
+                       x-model.trim="params.location.country" />
+              </div>
+
+              <!-- Timezone -->
+              <div>
+                <label for="tz" class="block text-sm font-medium mb-1">Time Zone</label>
+                <input id="tz" type="text" class="form-input w-full" placeholder="e.g., Africa/Cairo"
+                       x-model.trim="params.location.tz" />
+                <p class="text-xs text-gray-500 mt-1">Used for scheduling & localizing send times.</p>
+              </div>
+
+              <!-- Birthday -->
+              <div>
+                <label for="birthday" class="block text-sm font-medium mb-1">Birthday</label>
+                <input id="birthday" type="date" class="form-input w-full"
+                       x-model="params.merge_fields.BIRTHDAY" />
+              </div>
+
+
+              <div >
+                <label for="audience_id" class="block text-sm font-medium mb-1 ">Tags</label>
+                <div class="relative">
+                    <select  x-ref="tagsSelect" x-init="$nextTick(() => initSelect2())" class="selectize" multiple>
+                      <option value="orange">Orange</option>
+                      <option value="white">White</option>
+                      <option value="blue">Blue</option>
+                    </select>
+                  
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Choose tags.</p>
+              </div>
+
+              <!-- Audience -->
+              <div >
+                <label for="audience_id" class="block text-sm font-medium mb-1">Audience <span class="text-red-500">*</span></label>
+                <div class="relative">
+                  <select id="audience_id" class="form-input w-full appearance-none pr-10"
+                          x-model="params.audience_id">
+                    <option value="" disabled selected>Select an audience…</option>
+                    <template x-for="a in audiences" :key="a.id">
+                      <option :value="a.id" x-text="a.name"></option>
+                    </template>
                   </select>
                 </div>
+                <p class="text-xs text-gray-500 mt-1">Choose where to add this contact.</p>
               </div>
-              <div>
-                <label>Tags (comma separated)</label>
-                <input
-                  type="text"
-                  class="form-input"
-                  placeholder="VIP, Lead, Customer"
-                  x-model="form.tagsCsv"
-                />
-              </div>
-              <div>
-                <label>Location</label>
-                <input
-                  type="text"
-                  class="form-input"
-                  placeholder="City, Country"
-                  x-model="form.location"
-                />
-              </div>
+
+
+              
             </div>
-            <div class="flex justify-end items-center mt-6">
-              <button
-                type="button"
-                class="btn btn-outline-danger"
-                @click="closeModal()"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                class="btn btn-primary ltr:ml-3 rtl:mr-3"
-                x-text="form.id ? 'Update' : 'Add'"
-              ></button>
+
+            <!-- Actions -->
+            <div class="flex justify-end items-center gap-3 pt-2">
+              <button type="button" class="btn btn-outline-danger" @click="addcontactModal = false">Cancel</button>
+              <button type="submit" class="btn btn-primary" x-text="params.id ? 'Update contact' : 'Create contact'"></button>
             </div>
+
           </form>
         </div>
       </div>
     </div>
   </div>
+</template>
+
+    <!-- Filters -->
+     <form method="GET" >
+        <div class="w-full mt-2">
+        <div class="bg-white/70 backdrop-blur rounded-2xl shadow ring-1 ring-gray-200 p-4 sm:p-5">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+            <!-- Search -->
+            <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Search</label>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                    <div class="relative">
+                    <input type="text" class="form-input w-full pl-9" placeholder="Search contacts…" x-model="filters.search" name="search">
+                    <div class="absolute ltr:right-[11px] rtl:left-[11px] top-1/2 -translate-y-1/2 peer-focus:text-primary">
+                        <svg class="mx-auto" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="11.5" cy="11.5" r="9.5" stroke="currentColor" stroke-width="1.5" opacity="0.5"></circle>
+                            <path d="M18.5 18.5L22 22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+                        </svg>
+                    </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Audience -->
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Audience</label>
+                <select class="form-input w-full" name="audience" @click.once="loadAudiences()" >
+                <option value="">All audiences</option>
+                    <template x-for="a in audiences" :key="a.id">
+                        <option :value="a.id" x-text="a.name" :selected="a.id === filters.audience"></option>
+                    </template>
+                
+                </select>
+            </div>
+            <!-- Status -->
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                <select class="form-input w-full"  x-model="filters.status" name="status">
+                    <option value="" >Any status</option>
+                    <template x-for="s in statusOptions" :key="s">
+                        <option :value="s" x-text="s" :selected="s === filters.status"></option>
+                    </template>
+                </select>
+
+            </div>
+            <!-- Kind -->
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Kind</label>
+                <select class="form-input w-full" name="kind" x-model="filters.kind">
+                <option value="" disabled selected>Any kind</option>
+                <template x-for="k in kindOptions" :key="k">
+                    <option :value="k" x-text="k" :selected="k === filters.kind"></option>
+                </template>
+                </select>
+            </div>
+            <!-- Actions -->
+            <div class="md:col-span-5 flex items-center justify-between  pt-1">
+                <div class="flex items-center gap-3 w-full">
+                <a href="/contacts" class="btn btn-outline-danger" >Reset</a>
+                <button type="submit" class="btn btn-outline-primary" >Filter</button>
+                <button type="button" class="flex-1 btn text-white bg-gradient-to-r from-[#4361ee] to-[#160f6b] !border-0 !shadow-md hover:shadow-lg !rounded-xl px-4 py-2.5 flex items-center gap-2" @click="editcontact()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>New contact</span>
+                </button>
+                </div>
+            </div>
+            </div>
+        </div>
+        </div>
+    </form>
+
+    <div class="mt-5 panel p-0 border-0 overflow-hidden">
+        <template x-if="isLoading">
+        <div class="flex items-center justify-center py-10">
+            <svg class="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none"
+                viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10"
+                    stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span class="ml-3 text-gray-600 dark:text-gray-300">Loading contacts…</span>
+        </div>
+        </template>
+        <template x-if="!isLoading">
+            <div class="table-responsive table-sticky" x-on:scroll="scrolledX = $el.scrollLeft > 0"
+  :class="{ 'is-scrolled-x': scrolledX }">
+                <table class="table-striped table-hover whitespace-nowrap min-w-[1100px]" >
+                    <thead>
+                      <tr>
+                        <th class="!w-10 sticky-col-1">
+                          <input
+                            type="checkbox"
+                            @change="toggleAll($event)"
+                            :checked="allOnPageSelected"
+                            
+                          />
+                        </th>
+                        <th class="sticky-col-2">Email Address</th>
+                        <th>First Name</th>
+                        <th>Last Name</th>
+                        <th>Address</th>
+                        <th>Phone Number</th>
+                        <th>Birthday</th>
+                        <th>Company</th>
+                        <th>Tags</th>
+                        <th>Email Marketing</th>
+                        <th>Source</th>
+                        <th class="cursor-pointer whitespace-nowrap">Created AT</th>
+                        <th class="!text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                        <tr x-show="!isLoading && contactsList.length === 0">
+                        <td colspan="11" class="text-center text-lg py-6 text-danger dark:text-danger" style="text-align:center">
+                            No contacts found
+                        </td>
+                        </tr>
+                        
+                        <template x-for="contact in contactsList" :key="contact.id">
+                          <tr>
+                            <!-- Select -->
+                            <td class="!w-10 sticky-col-1">
+                              <input
+                                type="checkbox"
+                                :checked="selected.has(contact.id)"
+                                @change="$event.target.checked ? selected.add(contact.id) : selected.delete(contact.id)"
+                              />
+                            </td>
+
+                            
+                            <!-- contact (name + optional audience) -->
+                            <td class="sticky-col-2" x-text="contact.email_address"></td>
+
+                            <td x-text="contact.merge_fields.FNAME"></td>
+
+                            <td x-text="contact.merge_fields.LNAME"></td>
+
+                            <td x-text="contact.location.country"></td>
+
+                            <td x-text="contact.merge_fields.PHONE"></td>
+
+                            <td x-text="contact.merge_fields.BIRTHDAY"></td>
+
+                            <td x-text="contact.merge_fields.COMPANY"></td>
+
+                            <td >
+                              <div >
+                                <template  x-for="(tag, i) in contact.tags" :key="i">
+                                    <div class="mt-2 " :class="(i + 1) % 2 !== 0 && (i + 1) >= 3  ? 'block' : 'inline'">
+                                      <span class="badge bg-dark m-2" x-text="tag"></span>
+                                      <br x-show="(i + 1) % 2 === 0" >
+                                    </div>
+                                </template>
+                              </div>
+                            </td>
+
+                            <td>
+                                <span class="badge"
+                                :class="{
+                                  'badge bg-success': contact.status === 'subscribed',
+                                  'badge bg-danger': contact.status === 'unsubscribed',
+                                  'badge bg-warning': contact.status === 'cleaned',
+                                  'badge bg-info': contact.status === 'pending',
+                                }"
+                                x-text="contact.status">
+                                </span>
+                            </td>
+
+                            <td x-text="contact.signup_source"></td>
+
+                            <td class="whitespace-nowrap"
+                                x-text="contact.created_at ? new Date(contact.created_at).toLocaleString() : ''">
+                            </td>
+
+                            <!-- Actions -->
+                            <td class="!text-center">
+                              <div class="flex items-center justify-center gap-2">
+                                <button x-show="contact.status !== 'sending' && contact.status !== 'completed'" type="button" class="btn btn-sm btn-outline-primary" @click="editcontact(contact)" >Edit</button>
+                                <a :href="`contacts/update/?id=${contact.id}`" class="btn btn-sm btn-outline-secondary" >Preview</a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @click="showAlert()">Delete</button>
+                              </div>
+                            </td>
+                          </tr>
+                        </template>
+
+                    </tbody>
+                </table>
+            </div>
+        </template>
+        
+    </div>
+
+    
+    <div x-show="!isLoading && totalPages > 0" class="flex justify-center w-full mt-6">
+            <ul class="inline-flex items-center space-x-1 rtl:space-x-reverse">
+              <!-- Prev -->
+              <li>
+                  <button type="button" :disabled="!prevPageUrl"
+                      @click="if (currentPage > 1) loadData(currentPage - 1)"
+                      class="flex justify-center font-semibold px-3.5 py-2 rounded transition
+                            bg-white-light text-dark hover:text-white hover:bg-primary
+                            dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary">
+                      Prev
+                  </button>
+              </li>
+
+              <!-- Pages -->
+              <template x-for="page in pageRange()" :key="page">
+                  <li>
+                      <button type="button" @click="loadData(page)"
+                          :class="`flex justify-center font-semibold px-3.5 py-2 rounded transition ${
+                              currentPage === page
+                              ? 'bg-primary text-white dark:text-white-light dark:bg-primary'
+                              : 'bg-white-light text-dark hover:text-white hover:bg-primary dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary'
+                          }`"
+                          x-text="page">
+                      </button>
+                  </li>
+              </template>
+
+              <!-- Next -->
+              <li>
+                  <button type="button" :disabled="!nextPageUrl"
+                      @click="if (currentPage < totalPages) loadData(currentPage + 1)"
+                      class="flex justify-center font-semibold px-3.5 py-2 rounded transition
+                            bg-white-light text-dark hover:text-white hover:bg-primary
+                            dark:text-white-light dark:bg-[#191e3a] dark:hover:bg-primary">
+                      Next
+                  </button>
+              </li>
+          </ul>
+    </div>
+    
 </div>
-<script>
-fetch("/api/audience/contacts/?audience=a4b78b5a-d560-4367-9d89-0dee0ab79b19")
-  .then(r => r.json()).then(console.log)
-</script>
+
 
 <script>
-  document.addEventListener("alpine:init", () => {
-    Alpine.data("contacts", () => ({
-      // UI state
-      q: "",
-      filters: { status: "", segment: "", tags: [] },
-      tagToToggle: "",
-      selected: new Set(),
-      modal: false,
-      page: 1,
-      perPage: 10,
-      sort: { key: "name", dir: "asc" },
+      
+    document.addEventListener("alpine:init", () => {
+        Alpine.data("contacts", () => ({
+            defaultParams: {
+                id: null,
+                email_address: '',
+                merge_fields:{
+                  FNAME:'',
+                  LNAME:'',
+                  BIRTHDAY:'',
+                  PHONE:'',
+                  COMPANY:'',
+                },
+                location:{
+                  country:'',
+                  tz:'',
+                },
+                audience_id:'',
+                signup_source:'form',
+                tags:[],
+            },
+            filters: {
+                'search': '{{ request.GET.search|default:"" }}',
+                'status': '{{ request.GET.status|default:"" }}',
+                'kind': '{{ request.GET.kind|default:"" }}',
+                'audience': '{{ request.GET.audience|default:"" }}',
+            },
+            
+            selected: new Set(),
+            addcontactModal: false,
+            params: {
+                id: null,
+                email_address: '',
+                merge_fields:{
+                  FNAME:'',
+                  LNAME:'',
+                  BIRTHDAY:'',
+                  PHONE:'',
+                  COMPANY:'',
+                },
+                location:{
+                  country:'',
+                  tz:'',
+                },
+                audience_id:'',
+                signup_source:'form',
+                tags:[],
+            },
+            //data
+            contactsList: [],
+            audiences: [],
+            statusOptions: ['subscribed','unsubscribed','cleaned','pending'],
+            kindOptions: ["regular","automated","rss"], 
 
-      // Data
-      allTags: ["VIP", "Lead", "Customer", "Newsletter", "Trial", "High-Value"],
-      contacts: [
-        {
-          id: 1,
-          path: "profile-35.png",
-          name: "Alan Green",
-          email: "alan@mail.com",
-          status: "subscribed",
-          tags: ["VIP", "Customer"],
-          source: "Form",
-          signup_at: "2025-07-22",
-          last_activity_at: "2025-08-10",
-          phone: "+1 202 555 0197",
-          location: "Boston, USA",
-        },
-        {
-          id: 2,
-          path: "profile-35.png",
-          name: "Linda Nelson",
-          email: "linda@mail.com",
-          status: "unsubscribed",
-          tags: ["Newsletter"],
-          source: "Import",
-          signup_at: "2025-05-18",
-          last_activity_at: "2025-06-01",
-          phone: "+1 202 555 0170",
-          location: "Sydney, Australia",
-        },
-        {
-          id: 3,
-          path: "profile-35.png",
-          name: "Lila Perry",
-          email: "lila@mail.com",
-          status: "subscribed",
-          tags: ["Lead"],
-          source: "API",
-          signup_at: "2025-08-01",
-          last_activity_at: "2025-08-12",
-          phone: "+1 202 555 0105",
-          location: "Miami, USA",
-        },
-        {
-          id: 4,
-          path: "profile-35.png",
-          name: "Andy King",
-          email: "andy@mail.com",
-          status: "non-subscribed",
-          tags: ["Trial"],
-          source: "Form",
-          signup_at: "2025-07-28",
-          last_activity_at: "2025-07-30",
-          phone: "+81 202 555 0194",
-          location: "Tokyo, Japan",
-        },
-        {
-          id: 5,
-          path: "profile-35.png",
-          name: "Jesse Cory",
-          email: "jesse@mail.com",
-          status: "cleaned",
-          tags: ["Newsletter", "Lead"],
-          source: "Import",
-          signup_at: "2025-04-04",
-          last_activity_at: "2025-05-12",
-          phone: "+44 202 555 0161",
-          location: "Edinburgh, UK",
-        },
-        {
-          id: 6,
-          path: "profile-35.png",
-          name: "Xavier",
-          email: "xavier@mail.com",
-          status: "subscribed",
-          tags: ["Customer"],
-          source: "Form",
-          signup_at: "2025-08-10",
-          last_activity_at: "2025-08-13",
-          phone: "+1 202 555 0155",
-          location: "New York, USA",
-        },
-        {
-          id: 7,
-          path: "profile-35.png",
-          name: "Susan",
-          email: "susan@mail.com",
-          status: "subscribed",
-          tags: ["VIP", "High-Value"],
-          source: "CRM Sync",
-          signup_at: "2025-06-12",
-          last_activity_at: "2025-08-03",
-          phone: "+1 202 555 0118",
-          location: "Miami, USA",
-        },
-        {
-          id: 8,
-          path: "profile-35.png",
-          name: "Traci Lopez",
-          email: "traci@mail.com",
-          status: "unsubscribed",
-          tags: ["Newsletter"],
-          source: "Import",
-          signup_at: "2025-05-22",
-          last_activity_at: "2025-07-01",
-          phone: "+44 202 555 0135",
-          location: "Edinburgh, UK",
-        },
-        {
-          id: 9,
-          path: "profile-35.png",
-          name: "Steven M.",
-          email: "sokol@verizon.net",
-          status: "subscribed",
-          tags: ["Lead", "Trial"],
-          source: "API",
-          signup_at: "2025-07-01",
-          last_activity_at: "2025-08-11",
-          phone: "+1 202 555 0100",
-          location: "Monrovia, US",
-        },
-        {
-          id: 10,
-          path: "profile-35.png",
-          name: "James Cantrell",
-          email: "sravani@comcast.net",
-          status: "subscribed",
-          tags: ["Customer"],
-          source: "Form",
-          signup_at: "2025-02-09",
-          last_activity_at: "2025-08-09",
-          phone: "+1 202 555 0134",
-          location: "Michigan, US",
-        },
-        {
-          id: 11,
-          path: "profile-35.png",
-          name: "Reginald Brown",
-          email: "drhyde@gmail.com",
-          status: "non-subscribed",
-          tags: ["Trial"],
-          source: "API",
-          signup_at: "2025-03-28",
-          last_activity_at: "2025-04-02",
-          phone: "+34 202 555 0153",
-          location: "Entrimo, Spain",
-        },
-        {
-          id: 12,
-          path: "profile-35.png",
-          name: "Stacey Smith",
-          email: "maikelnai@optonline.net",
-          status: "subscribed",
-          tags: ["Newsletter", "VIP"],
-          source: "Form",
-          signup_at: "2025-08-11",
-          last_activity_at: "2025-08-14",
-          phone: "+48 202 555 0115",
-          location: "Lublin, Poland",
-        },
-      ],
+            //pagination
+            isLoading: false,
+            count: 0,
+            currentPage: 1,
+            itemsPerPage: 8,
+            nextPageUrl: null,
+            prevPageUrl: null,
+            totalPages: 0,
+            windowSize: 5,
+            scrolledX: false,
+            selectedd:[],
 
-      // Derived
-      get filtered() {
-        let items = this.contacts;
 
-        // search
-        const q = this.q.trim().toLowerCase();
-        if (q)
-          items = items.filter(
-            (c) =>
-              (c.name || "").toLowerCase().includes(q) ||
-              (c.email || "").toLowerCase().includes(q)
-          );
+            pageRange() {
+                let start = this.currentPage - Math.floor(this.windowSize / 2);
+                let end = this.currentPage + Math.floor(this.windowSize / 2);
 
-        // status
-        if (this.filters.status) {
-          items = items.filter((c) => c.status === this.filters.status);
-        }
-
-        // segment (simple Mailchimp-like presets)
-        if (this.filters.segment === "recent") {
-          items = items.filter((c) => this.daysAgo(c.last_activity_at) <= 30);
-        } else if (this.filters.segment === "cold") {
-          items = items.filter((c) => this.daysAgo(c.last_activity_at) > 90);
-        } else if (this.filters.segment === "new") {
-          items = items.filter((c) => this.daysAgo(c.signup_at) <= 7);
-        }
-
-        // tags (AND)
-        if (this.filters.tags.length) {
-          items = items.filter((c) =>
-            this.filters.tags.every((t) => c.tags.includes(t))
-          );
-        }
-
-        // sort
-        items = [...items].sort((a, b) => {
-          const k = this.sort.key;
-          const av = (a[k] ?? "").toString().toLowerCase();
-          const bv = (b[k] ?? "").toString().toLowerCase();
-          if (av < bv) return this.sort.dir === "asc" ? -1 : 1;
-          if (av > bv) return this.sort.dir === "asc" ? 1 : -1;
-          return 0;
-        });
-
-        return items;
-      },
-
-      get totalPages() {
-        return Math.max(1, Math.ceil(this.filtered.length / this.perPage));
-      },
-      get pageItems() {
-        const start = (this.page - 1) * this.perPage;
-        return this.filtered.slice(start, start + this.perPage);
-      },
-      get fromRow() {
-        return this.filtered.length ? (this.page - 1) * this.perPage + 1 : 0;
-      },
-      get toRow() {
-        return Math.min(this.filtered.length, this.page * this.perPage);
-      },
-      get allOnPageSelected() {
-        return (
-          this.pageItems.length &&
-          this.pageItems.every((i) => this.selected.has(i.id))
-        );
-      },
-
-      // Form state
-      form: {
-        id: null,
-        name: "",
-        email: "",
-        phone: "",
-        status: "subscribed",
-        tagsCsv: "",
-        location: "",
-      },
-
-      // Methods
-      applyFilters() {
-        this.page = 1;
-      },
-      clearFilters() {
-        this.q = "";
-        this.filters = { status: "", segment: "", tags: [] };
-        this.tagToToggle = "";
-        this.page = 1;
-      },
-      toggleTagFilter() {
-        if (!this.tagToToggle) return;
-        const t = this.tagToToggle;
-        if (!this.filters.tags.includes(t)) this.filters.tags.push(t);
-        this.tagToToggle = "";
-        this.applyFilters();
-      },
-      removeTagFilter(t) {
-        this.filters.tags = this.filters.tags.filter((x) => x !== t);
-        this.applyFilters();
-      },
-
-      toggleAll(e) {
-        if (e.target.checked) {
-          this.pageItems.forEach((i) => this.selected.add(i.id));
-        } else {
-          this.pageItems.forEach((i) => this.selected.delete(i.id));
-        }
-      },
-      toggleOne(id, e) {
-        if (e.target.checked) this.selected.add(id);
-        else this.selected.delete(id);
-      },
-
-      sortBy(key) {
-        if (this.sort.key === key) {
-          this.sort.dir = this.sort.dir === "asc" ? "desc" : "asc";
-        } else {
-          this.sort.key = key;
-          this.sort.dir = "asc";
-        }
-      },
-
-      bulk(action) {
-        if (!this.selected.size) return;
-        const ids = new Set(this.selected);
-        if (action === "delete") {
-          this.contacts = this.contacts.filter((c) => !ids.has(c.id));
-        } else if (action === "unsubscribe") {
-          this.contacts = this.contacts.map((c) =>
-            ids.has(c.id) ? { ...c, status: "unsubscribed" } : c
-          );
-        } else if (action === "tag") {
-          const tag = prompt("Add tag name:");
-          if (tag) {
-            this.contacts = this.contacts.map((c) => {
-              if (!ids.has(c.id)) return c;
-              const tags = c.tags.includes(tag) ? c.tags : [...c.tags, tag];
-              if (!this.allTags.includes(tag)) this.allTags.push(tag);
-              return { ...c, tags };
-            });
-          }
-        }
-        this.selected.clear();
-        this.toast("Bulk action completed.");
-      },
-
-      openAdd() {
-        this.form = {
-          id: null,
-          name: "",
-          email: "",
-          phone: "",
-          status: "subscribed",
-          tagsCsv: "",
-          location: "",
-        };
-        this.modal = true;
-      },
-      openEdit(c) {
-        this.form = {
-          id: c.id,
-          name: c.name,
-          email: c.email,
-          phone: c.phone,
-          status: c.status,
-          tagsCsv: (c.tags || []).join(", "),
-          location: c.location || "",
-        };
-        this.modal = true;
-      },
-      closeModal() {
-        this.modal = false;
-      },
-
-      save() {
-        // basic validation
-        if (!this.form.name) return this.toast("Name is required", "error");
-        if (!this.form.email) return this.toast("Email is required", "error");
-
-        const tags = (this.form.tagsCsv || "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-
-        if (this.form.id) {
-          // update
-          this.contacts = this.contacts.map((c) =>
-            c.id === this.form.id
-              ? {
-                  ...c,
-                  name: this.form.name,
-                  email: this.form.email,
-                  phone: this.form.phone,
-                  status: this.form.status,
-                  tags,
-                  location: this.form.location,
+                if (start < 1) {
+                    start = 1;
+                    end = this.windowSize;
                 }
-              : c
-          );
-        } else {
-          const maxId = this.contacts.reduce((m, c) => Math.max(m, c.id), 0);
-          this.contacts.unshift({
-            id: maxId + 1,
-            path: "profile-35.png",
-            name: this.form.name,
-            email: this.form.email,
-            phone: this.form.phone,
-            status: this.form.status,
-            tags,
-            source: "Form",
-            signup_at: new Date().toISOString().slice(0, 10),
-            last_activity_at: new Date().toISOString().slice(0, 10),
-            location: this.form.location,
-          });
-        }
-        // add new tags to tag list
-        tags.forEach((t) => {
-          if (!this.allTags.includes(t)) this.allTags.push(t);
-        });
+                if (end > this.totalPages) {
+                    end = this.totalPages;
+                    start = this.totalPages - this.windowSize + 1;
+                    if (start < 1) start = 1;
+                }
 
-        this.modal = false;
-        this.toast("Contact saved.");
-      },
+                let pages = [];
+                for (let i = start; i <= end; i++) {
+                    pages.push(i);
+                }
+                return pages;
+            },
+            
+            init() {
+                this.loadData();
+                this.loadAudiences();
+            },
 
-      remove(c) {
-        if (!confirm("Delete this contact?")) return;
-        this.contacts = this.contacts.filter((x) => x.id !== c.id);
-        this.selected.delete(c.id);
-        this.toast("Contact deleted.");
-      },
+            initSelect2() {
+              const el = this.$refs.tagsSelect;
+              const self = this;
 
-      // helpers
-      statusClass(s) {
-        const base = "px-2.5 py-0.5 rounded-full text-xs";
-        if (s === "subscribed")
-          return (
-            base +
-            " bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-          );
-        if (s === "unsubscribed")
-          return (
-            base +
-            " bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
-          );
-        if (s === "cleaned")
-          return (
-            base +
-            " bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
-          );
-        return (
-          base +
-          " bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-        );
-      },
-      cap(s) {
-        return (s || "").replace(/(^.|[-_\s].)/g, (x) => x.toUpperCase());
-      },
-      fmtDate(s) {
-        if (!s) return "—";
-        const d = new Date(s);
-        return d.toLocaleDateString();
-      },
-      daysAgo(s) {
-        const d = new Date(s);
-        return Math.floor((Date.now() - d) / 86400000);
-      },
-      toast(msg = "", type = "success") {
-        if (window.Swal) {
-          const t = window.Swal.mixin({
-            toast: true,
-            position: "top",
-            showConfirmButton: false,
-            timer: 2500,
-          });
-          t.fire({ icon: type, title: msg, padding: "10px 20px" });
-        } else {
-          console.log(type.toUpperCase() + ":", msg);
-        }
-      },
+              console.log(self)
 
-      init() {
-        /* nothing else needed; computed props handle view */
-      },
-    }));
-  });
+              // If the select lives inside a modal, set dropdownParent to fix z-index clipping.
+              $(el).select2({
+                
+                tags: true,
+                tokenSeparators: [',', ' '],
+                width: '100%',
+                dropdownParent: $('#contactModal'), // change to your modal's id if needed
+              })
+              .on('change', function () {
+                self.params.tags = $(this).val() ?? [];
+              });
+
+              // Set initial value from Alpine into Select2
+              $(el).val(this.params.tags).trigger('change');
+
+              // Keep Select2 in sync when params.tags changes from code
+              this.$watch('params.tags', (v) => {
+                $(el).val(v).trigger('change.select2');
+              });
+            },
+
+            // Optional: if you recreate/destroy the modal, clean up Select2
+            destroySelect2() {
+              const el = this.$refs.tagsSelect;
+              if (el && $(el).data('select2')) $(el).select2('destroy');
+            },
+
+
+
+            loadAudiences(){                
+                if(this.audiences.length > 0){
+                    return;
+                }
+                fetch(`${APP_URL}/audiences/`)
+                .then(response => response.json())
+                .then(data => {
+                    this.audiences = data.results;
+                })
+                .catch(error => {
+                    this.showMessage('Error, Unexpected error happened', 'error')
+                });
+            },
+            loadTags(){
+                if(this.audiences.length > 0){
+                    return;
+                }
+                fetch(`${APP_URL}/audiences/`)
+                .then(response => response.json())
+                .then(data => {
+                    this.audiences = data.results;
+                })
+                .catch(error => {
+                    this.showMessage('Error, Unexpected error happened', 'error')
+                });
+            },
+            sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            },
+            async loadData(page = null){
+                try {
+                    this.isLoading = true;
+                    //await this.sleep(2000); // Simulate loading delay
+                    let baseUrl = `${APP_URL}/contacts/`;
+                    let queryString = new URLSearchParams(window.location.search);
+                    if (page) {
+                        queryString.set('page', page);
+                    }
+                    this.currentPage = parseInt(queryString.get('page')) || 1;
+                    let url = baseUrl + '?' + queryString.toString();
+                    let response = await fetch(url);
+                    let data = await response.json();
+                    this.count = data.count;
+                    this.nextPageUrl = data.next;
+                    this.prevPageUrl = data.previous;
+                    this.isLoading = false;
+                    this.contactsList = data.results;
+                    this.totalPages = Math.ceil(this.count / this.itemsPerPage);
+                    window.history.pushState({}, '', `?${queryString.toString()}`);
+                } catch (error) {
+                    this.showMessage('Error, Unexpected error happened', 'error')
+                }
+            },
+            editcontact(contact) {
+              console.log(contact);
+                if(this.audiences.length === 0){
+                    this.loadAudiences();
+                }
+                this.params = JSON.parse(JSON.stringify(this.defaultParams));
+
+                if (contact) {
+                  console.log(contact);
+                    this.params = JSON.parse(JSON.stringify(contact));
+                }
+                
+                this.addcontactModal = true;
+                this.$nextTick(() => this.initSelect2());
+            },
+            async saveContact() {
+                if (!this.params.email_address) {
+                    this.showMessage('Email Address is required.', 'error');
+                    return ;
+                }
+                if (!this.params.merge_fields.FNAME) {
+                    this.showMessage('First Name is required.', 'error');
+                    return ;
+                }
+                if (!this.params.audience_id) {
+                    this.showMessage('Audience is required.', 'error');
+                    return ;
+                }                
+                if (this.params.id) {
+                    //update contact
+                    try{
+                      let response = await fetch(`${APP_URL}/contacts/${this.params.id}/`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie("csrftoken"),
+                      },
+                      body: JSON.stringify(this.params)
+                    });
+                      if(!response.ok)
+                      {
+                        this.showMessage('Unexpected error happened', 'error');
+                      }else{
+                        this.loadData();
+                        this.showMessage('Contact updated successfully.');
+                      }
+                    }catch(e){
+                      this.showMessage('Error , Unexpected error happened', 'error')
+                    }
+                    finally{
+                        this.addcontactModal = false;  
+                    } 
+                } else {
+                    //add contact
+                    try{
+                      let response = await fetch(`${APP_URL}/contacts/`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie("csrftoken"),
+                      },
+                      body: JSON.stringify(this.params)
+                    });
+                     if(!response.ok)
+                      {
+                        this.showMessage('Unexpected error happened', 'error');
+                      }else{
+                        this.loadData();
+                        this.showMessage('Contact created successfully.');
+                      }    
+                    }catch(e){
+                        this.showMessage('Error , Unexpected error happened', 'error')
+                    }finally{
+                        this.addcontactModal = false;  
+                    }                    
+                }
+            },
+            async Pausecontact(contact){
+                try{
+                        let response = await fetch(`${APP_URL}/contacts/${contact.id}/pause/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            "X-CSRFToken": getCookie("csrftoken"),
+                        },
+                    });
+                        let data = await response.json();
+                        this.showMessage('contact has stopped successfully.');
+                        this.loadData();
+                    }catch(e){
+                        this.showMessage('Error , Unexpected error happened', 'error')
+                    }
+            },
+            async Resumecontact(contact){
+                try{
+                        let response = await fetch(`${APP_URL}/contacts/${contact.id}/resume/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            "X-CSRFToken": getCookie("csrftoken"),
+                        },
+                    });
+                        let data = await response.json();
+                        this.loadData();
+                    }catch(e){
+                        this.showMessage('Error , Unexpected error happened', 'error')
+                    }
+            },
+            deletecontact(contact) {
+                this.contactsList = this.contactsList.filter((d) => d.id != contact.id);
+                this.showMessage('Contact has been deleted successfully.');
+            },
+            showMessage(msg = '', type = 'success') {
+                const toast = window.Swal.mixin({
+                    toast: true,
+                    position: 'top',
+                    showConfirmButton: false,
+                    timer: 3000,
+                    
+                });
+                toast.fire({
+                    icon: type,
+                    title: msg,
+                    padding: '10px 20px',
+                });
+            },
+        }));
+    });
+    
 </script>
-
-
 
 {% endblock %}

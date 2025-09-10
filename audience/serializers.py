@@ -36,7 +36,7 @@ class AudienceDetailSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "contacts_count", "contacts", "created_at"]
     
 class ContactSerializer(serializers.HyperlinkedModelSerializer):
-    audience_id = serializers.PrimaryKeyRelatedField(write_only=True, required=True,queryset=Audience.objects.all(), source='audience')
+    audience_id = serializers.PrimaryKeyRelatedField(required=True,queryset=Audience.objects.all(), source='audience')
     audience = serializers.SlugRelatedField(slug_field="name", read_only=True)
     tags = serializers.SlugRelatedField(
         many=True, read_only=True, slug_field="name"
@@ -44,11 +44,10 @@ class ContactSerializer(serializers.HyperlinkedModelSerializer):
     contact_url = serializers.HyperlinkedIdentityField(
         view_name='audience:contact-detail',  # include namespace if you used one (e.g., 'api:contact-detail')
     )
-    audience_url = serializers.HyperlinkedRelatedField(view_name = 'audience:audience-detail', read_only=True, source='audience')
 
     class Meta:
         model = Contact
         fields = [
-            "contact_url","id", "audience_url", "audience", "audience_id", "email_address", "status", "signup_source", 
+            "contact_url","id", "audience", "audience_id", "email_address", "status", "signup_source", 
             "merge_fields", "language", "location", "created_at", "tags",
         ]

@@ -1,5 +1,6 @@
 from rest_framework import viewsets , serializers
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 from django.db.models import Count, Q
 from django.db.models import Prefetch, QuerySet
 
@@ -9,10 +10,13 @@ from .serializers import AudienceSerialzer, ContactSerializer, TagSerialzer, Tag
 from audience.services import services
 
 
+
 class AudienceViewSet(viewsets.ModelViewSet):
-    queryset = Audience.objects.annotate(contacts_count = Count('contacts')).all()
+    queryset = Audience.objects.annotate(contacts_count = Count('contacts')).order_by("-created_at")
     permission_classes = [AllowAny]
+    search_fields = ["name"]
     pagination_class = None  # Disable pagination
+    
 
     def get_queryset(self) -> QuerySet[Audience]:
         queryset = super().get_queryset()
@@ -25,6 +29,11 @@ class AudienceViewSet(viewsets.ModelViewSet):
         if self.action == "retrieve"  and services.include_contacts(self.request.query_params.get("include_contacts")):
             return AudienceDetailSerializer
         return AudienceSerialzer
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"results": serializer.data})
 
 
 class TagViewSet(viewsets.ModelViewSet):

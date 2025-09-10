@@ -106,15 +106,13 @@ class Contact(models.Model):
 class Tag(models.Model):
     """Simple label; unique per audience."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    audience = models.ForeignKey(Audience, on_delete=models.CASCADE, related_name="tags")
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
 
     class Meta:
-        unique_together = [("audience", "name")]
         ordering = ["name"]
 
     def __str__(self):
-        return f"{self.name} ({self.audience.name})"
+        return self.name
     
 
 class ContactTag(models.Model):
