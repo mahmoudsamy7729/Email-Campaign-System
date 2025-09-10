@@ -57,8 +57,7 @@ class Contact(models.Model):
     unsubscribed_at = models.DateTimeField(blank=True, null=True)
     unsubscribed_ip = models.GenericIPAddressField(blank=True, null=True)
 
-    tags = models.ManyToManyField("Tag", through="ContactTag", related_name="contacts", blank=True)
-
+    tags = models.ManyToManyField("Tag", related_name="contacts", blank=True)
 
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -113,22 +112,7 @@ class Tag(models.Model):
 
     def __str__(self):
         return self.name
-    
-
-class ContactTag(models.Model):
-    """Through model to track when a tag was added."""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name="contact_tags")
-    tag = models.ForeignKey(Tag, on_delete=models.CASCADE, related_name="tag_contacts")
-    date_added = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        unique_together = [("contact", "tag")]
-        indexes = [models.Index(fields=["tag", "contact"])]
-
-    def __str__(self):
-        return f"{self.contact.email_address} ↔ {self.tag.name}"
-    
+        
 
 class ContactNote(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

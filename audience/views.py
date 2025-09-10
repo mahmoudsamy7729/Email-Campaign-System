@@ -37,9 +37,9 @@ class AudienceViewSet(viewsets.ModelViewSet):
 
 
 class TagViewSet(viewsets.ModelViewSet):
-    queryset = Tag.objects.select_related("audience").all()
+    queryset = Tag.objects.all()
     permission_classes = [AllowAny]
-    filterset_fields = ["audience"]
+    pagination_class = None  # Disable pagination
     search_fields = ["name"]
     ordering_fields = ["name"]
     ordering = ["name"]
@@ -55,6 +55,11 @@ class TagViewSet(viewsets.ModelViewSet):
         if self.action == "retrieve"  and services.include_contacts(self.request.query_params.get("include_contacts")):
             return TagDetailSerializer
         return TagSerialzer
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"results": serializer.data})
     
 
 class ContactViewSet(viewsets.ModelViewSet):

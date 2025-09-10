@@ -61,8 +61,14 @@
 
 </style>
 
-
-<div x-data="contacts()">
+<script id="tags-data" type="application/json">
+  [
+  {% for t in request.GET.tags %}
+    "{{ t }}"{% if not forloop.last %},{% endif %}
+  {% endfor %}
+  ]
+</script>
+<div x-data="contacts()" >
     <div class="flex items-center justify-between flex-wrap gap-4">
         <h2 class="text-xl">contacts</h2>
     </div>
@@ -153,12 +159,11 @@
               <div >
                 <label for="audience_id" class="block text-sm font-medium mb-1 ">Tags</label>
                 <div class="relative">
-                    <select  x-ref="tagsSelect" x-init="$nextTick(() => initSelect2())" class="selectize" multiple>
-                      <option value="orange">Orange</option>
-                      <option value="white">White</option>
-                      <option value="blue">Blue</option>
+                    <select  x-ref="tagsSelect" x-init="$nextTick(() => initSelect2())"  class="selectize" multiple>
+                    <template x-for="t in tags" :key="t.id">
+                      <option :value="t.id"  x-text="t.name"></option>
+                    </template>
                     </select>
-                  
                 </div>
                 <p class="text-xs text-gray-500 mt-1">Choose tags.</p>
               </div>
@@ -196,7 +201,7 @@
 </template>
 
     <!-- Filters -->
-     <form method="GET" >
+     <form method="GET" id="search-form">
         <div class="w-full mt-2">
         <div class="bg-white/70 backdrop-blur rounded-2xl shadow ring-1 ring-gray-200 p-4 sm:p-5">
             <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
@@ -240,11 +245,10 @@
             <!-- Kind -->
             <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Kind</label>
-                <select class="form-input w-full" name="kind" x-model="filters.kind">
-                <option value="" disabled selected>Any kind</option>
-                <template x-for="k in kindOptions" :key="k">
-                    <option :value="k" x-text="k" :selected="k === filters.kind"></option>
-                </template>
+                <select  x-ref="tagsSelectOutside" name="tags" x-init="$nextTick(() => initOutsideSelect())"  class="selectize" multiple>  
+                  <template x-for="t in tags" :key="t.id">
+                      <option :value="t.id" x-text="t.name"></option>
+                    </template>
                 </select>
             </div>
             <!-- Actions -->
@@ -306,7 +310,7 @@
                     </thead>
                     <tbody>
                         <tr x-show="!isLoading && contactsList.length === 0">
-                        <td colspan="11" class="text-center text-lg py-6 text-danger dark:text-danger" style="text-align:center">
+                        <td colspan="13" class="text-center text-lg py-6 text-danger dark:text-danger" style="text-align:center">
                             No contacts found
                         </td>
                         </tr>
@@ -342,7 +346,7 @@
                               <div >
                                 <template  x-for="(tag, i) in contact.tags" :key="i">
                                     <div class="mt-2 " :class="(i + 1) % 2 !== 0 && (i + 1) >= 3  ? 'block' : 'inline'">
-                                      <span class="badge bg-dark m-2" x-text="tag"></span>
+                                      <span class="badge bg-dark m-2" x-text="tag.name"></span>
                                       <br x-show="(i + 1) % 2 === 0" >
                                     </div>
                                 </template>
@@ -449,12 +453,13 @@
                 },
                 audience_id:'',
                 signup_source:'form',
+                tag_names:[],
                 tags:[],
             },
             filters: {
                 'search': '{{ request.GET.search|default:"" }}',
                 'status': '{{ request.GET.status|default:"" }}',
-                'kind': '{{ request.GET.kind|default:"" }}',
+                'tags': [],
                 'audience': '{{ request.GET.audience|default:"" }}',
             },
             
@@ -476,11 +481,13 @@
                 },
                 audience_id:'',
                 signup_source:'form',
+                tag_names:[],
                 tags:[],
             },
             //data
             contactsList: [],
             audiences: [],
+            tags:[],
             statusOptions: ['subscribed','unsubscribed','cleaned','pending'],
             kindOptions: ["regular","automated","rss"], 
 
@@ -494,8 +501,6 @@
             totalPages: 0,
             windowSize: 5,
             scrolledX: false,
-            selectedd:[],
-
 
             pageRange() {
                 let start = this.currentPage - Math.floor(this.windowSize / 2);
@@ -521,43 +526,59 @@
             init() {
                 this.loadData();
                 this.loadAudiences();
+                this.loadTags();
             },
 
             initSelect2() {
               const el = this.$refs.tagsSelect;
               const self = this;
-
-              console.log(self)
-
               // If the select lives inside a modal, set dropdownParent to fix z-index clipping.
               $(el).select2({
-                
                 tags: true,
                 tokenSeparators: [',', ' '],
                 width: '100%',
                 dropdownParent: $('#contactModal'), // change to your modal's id if needed
               })
               .on('change', function () {
-                self.params.tags = $(this).val() ?? [];
+                self.params.tag_names = $(this).val() ?? [];
               });
 
               // Set initial value from Alpine into Select2
               $(el).val(this.params.tags).trigger('change');
 
               // Keep Select2 in sync when params.tags changes from code
-              this.$watch('params.tags', (v) => {
+              this.$watch('params.tag_names', (v) => {
                 $(el).val(v).trigger('change.select2');
               });
             },
 
+            async initOutsideSelect(){
+              await this.loadTags();
+              const el = this.$refs.tagsSelectOutside;
+              const self = this;
+              let filtered = new URLSearchParams(window.location.search).getAll("tags");
+              $(el).select2({
+                  tags: true,
+                  tokenSeparators: [',', ' '],
+                  width: '100%',
+                })
+                
+                .on('change', function () {
+                  filtered = $(this).val() ?? [];
+                });
+
+                $(el).val(filtered).trigger('change');
+                this.$watch('filtered', (v) => {
+                  $(el).val(v).trigger('change.select2');
+                });
+                //this.$nextTick(() => this.initOutsideSelect());
+
+            },
             // Optional: if you recreate/destroy the modal, clean up Select2
             destroySelect2() {
               const el = this.$refs.tagsSelect;
               if (el && $(el).data('select2')) $(el).select2('destroy');
             },
-
-
-
             loadAudiences(){                
                 if(this.audiences.length > 0){
                     return;
@@ -571,18 +592,16 @@
                     this.showMessage('Error, Unexpected error happened', 'error')
                 });
             },
-            loadTags(){
-                if(this.audiences.length > 0){
-                    return;
+            async loadTags() {
+                if (this.tags.length > 0) return;
+
+                try {
+                    const response = await fetch(`${APP_URL}/tags/`);
+                    const data = await response.json();
+                    this.tags = data.results;
+                } catch (error) {
+                    this.showMessage('Error, Unexpected error happened', 'error');
                 }
-                fetch(`${APP_URL}/audiences/`)
-                .then(response => response.json())
-                .then(data => {
-                    this.audiences = data.results;
-                })
-                .catch(error => {
-                    this.showMessage('Error, Unexpected error happened', 'error')
-                });
             },
             sleep(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
@@ -612,17 +631,15 @@
                 }
             },
             editcontact(contact) {
-              console.log(contact);
                 if(this.audiences.length === 0){
                     this.loadAudiences();
                 }
                 this.params = JSON.parse(JSON.stringify(this.defaultParams));
 
                 if (contact) {
-                  console.log(contact);
                     this.params = JSON.parse(JSON.stringify(contact));
+                    this.params.tags = this.params.tags.map(t => t.id);
                 }
-                
                 this.addcontactModal = true;
                 this.$nextTick(() => this.initSelect2());
             },
